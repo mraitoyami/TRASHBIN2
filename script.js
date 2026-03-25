@@ -637,9 +637,13 @@ if (difficultySelect) {
 }
 
 restartButton.addEventListener("click", () => {
-  playerName = "";
+  if (!playerName) {
+    showStartScreen("");
+    return;
+  }
+
   hideWinScreen();
-  showStartScreen("");
+  restartGame();
 });
 startButton.addEventListener("click", () => {
   const nextName = sanitizePlayerName(playerNameInput.value);
