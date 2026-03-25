@@ -19,7 +19,7 @@
     <section class="hud">
       <div class="hud-card">
         <span class="label">Item</span>
-        <span id="item-count">1 / 8</span>
+        <span id="item-count">0 / 0</span>
       </div>
       <div class="hud-card">
         <span class="label">Score</span>
@@ -31,9 +31,18 @@
       </div>
       <div class="hud-card">
         <span class="label">Status</span>
-        <span id="status-text">Choose the right bin</span>
+        <span id="status-text">Press start</span>
       </div>
-      <button id="restart-button" class="restart-button" type="button">Restart</button>
+      <button id="restart-button" class="restart-button" type="button">Play Again</button>
+    </section>
+
+    <section class="controls-panel">
+      <div class="difficulty-group" role="group" aria-label="Difficulty level">
+        <button class="difficulty-button active" data-difficulty="easy" type="button">Easy</button>
+        <button class="difficulty-button" data-difficulty="normal" type="button">Normal</button>
+        <button class="difficulty-button" data-difficulty="hard" type="button">Hard</button>
+      </div>
+      <button id="music-button" class="music-button" type="button">Music: On</button>
     </section>
 
     <section class="play-area">
@@ -51,7 +60,7 @@
           <h2 id="trash-name">Banana Peel</h2>
           <p id="trash-hint" class="trash-hint">This item needs to go into the correct bin.</p>
         </div>
-        <p id="drag-help" class="drag-help">Drag this trash onto a bin, or click a bin to sort it.</p>
+        <p id="drag-help" class="drag-help">Drag this trash onto a bin, tap a bin, or use touch and drop on mobile.</p>
       </div>
 
       <div class="bins" role="group" aria-label="Sorting bins">
@@ -75,9 +84,32 @@
 
     <section id="message-panel" class="message-panel" aria-live="polite">
       <h3 id="message-title">Ready?</h3>
-      <p id="message-body">Sort all 8 items correctly to win.</p>
+      <p id="message-body">Choose a difficulty and press Start Game.</p>
+    </section>
+
+    <section class="leaderboard-panel">
+      <div class="leaderboard-card">
+        <h3>Leaderboard</h3>
+        <p class="leaderboard-copy">Top scores are saved in your browser on this device.</p>
+        <ol id="leaderboard-list" class="leaderboard-list">
+          <li>No scores yet.</li>
+        </ol>
+      </div>
     </section>
   </main>
+
+  <div id="start-screen" class="start-screen">
+    <div class="start-card">
+      <p class="eyebrow">Sort fast. Sort smart.</p>
+      <h2>Start The Cleanup</h2>
+      <p>
+        Drag or tap each garbage item into the right bin. One mistake ends the run, and the timer keeps ticking.
+      </p>
+      <button id="start-button" class="start-button" type="button">Start Game</button>
+    </div>
+  </div>
+
+  <div id="drag-ghost" class="drag-ghost" aria-hidden="true"></div>
 
   <script src="garbage-data.js"></script>
   <script src="script.js"></script>
