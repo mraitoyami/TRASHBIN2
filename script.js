@@ -17,13 +17,9 @@ const startScreen = document.getElementById("start-screen");
 const winScreen = document.getElementById("win-screen");
 const winSummary = document.getElementById("win-summary");
 const winPlayAgainButton = document.getElementById("win-play-again");
-const musicButton = document.getElementById("music-button");
+const playerNameInput = document.getElementById("player-name");
 const leaderboardList = document.getElementById("leaderboard-list");
 const dragGhost = document.getElementById("drag-ghost");
-const bgMusic = document.getElementById("bg-music");
-const correctSfx = document.getElementById("correct-sfx");
-const wrongSfx = document.getElementById("wrong-sfx");
-const winSfx = document.getElementById("win-sfx");
 const binButtons = [...document.querySelectorAll(".bin")];
 const difficultyButtons = [...document.querySelectorAll(".difficulty-button")];
 
@@ -36,9 +32,7 @@ let timeLeft = 60;
 let timerId = null;
 let selectedDifficulty = "easy";
 let dragState = null;
-let musicEnabled = true;
-let musicIntervalId = null;
-const brokenAudioIds = new Set();
+let playerName = "";
 
 const difficultySettings = {
   easy: {
@@ -60,8 +54,6 @@ const difficultySettings = {
     itemCount: 12,
   },
 };
-
-const musicPattern = [262, 330, 392, 330, 294, 349, 440, 349];
 
 function playTone(frequency, duration, type = "sine", volume = 0.03) {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -96,92 +88,18 @@ function playTone(frequency, duration, type = "sine", volume = 0.03) {
 }
 
 function playCorrectSound() {
-  if (playAudio(correctSfx)) {
-    return;
-  }
-
   playTone(720, 0.12, "triangle");
   setTimeout(() => playTone(920, 0.12, "triangle"), 90);
 }
 
 function playWrongSound() {
-  if (playAudio(wrongSfx)) {
-    return;
-  }
-
   playTone(240, 0.22, "sawtooth");
 }
 
 function playWinSound() {
-  if (playAudio(winSfx)) {
-    return;
-  }
-
   [520, 660, 880].forEach((tone, index) => {
     setTimeout(() => playTone(tone, 0.16, "triangle"), index * 110);
   });
-}
-
-function playAudio(audioElement) {
-  if (!audioElement || !audioElement.currentSrc || brokenAudioIds.has(audioElement.id)) {
-    return false;
-  }
-
-  audioElement.currentTime = 0;
-  const playAttempt = audioElement.play();
-
-  if (playAttempt && typeof playAttempt.catch === "function") {
-    playAttempt.catch(() => {});
-  }
-
-  return true;
-}
-
-function playMusicStep() {
-  if (!musicEnabled || !isPlaying) {
-    return;
-  }
-
-  musicPattern.forEach((tone, index) => {
-    setTimeout(() => {
-      if (musicEnabled && isPlaying) {
-        playTone(tone, 0.22, "sine", 0.015);
-      }
-    }, index * 260);
-  });
-}
-
-function stopMusic() {
-  if (musicIntervalId) {
-    window.clearInterval(musicIntervalId);
-    musicIntervalId = null;
-  }
-
-  if (bgMusic) {
-    bgMusic.pause();
-    bgMusic.currentTime = 0;
-  }
-}
-
-function startMusic() {
-  stopMusic();
-
-  if (!musicEnabled || !isPlaying) {
-    return;
-  }
-
-  if (bgMusic && bgMusic.currentSrc && !brokenAudioIds.has(bgMusic.id)) {
-    const playAttempt = bgMusic.play();
-
-    if (playAttempt && typeof playAttempt.catch === "function") {
-      playAttempt.catch(() => {});
-    }
-
-    return;
-  }
-
-  playMusicStep();
-  musicIntervalId = window.setInterval(playMusicStep, musicPattern.length * 260 + 400);
 }
 
 function clearTimer() {
@@ -283,7 +201,6 @@ function handleWin() {
   isGameOver = true;
   isPlaying = false;
   clearTimer();
-  stopMusic();
   setBinsDisabled(true);
   statusText.textContent = "You win";
   playWinSound();
@@ -302,7 +219,6 @@ function handleLoss(correctBin) {
   isGameOver = true;
   isPlaying = false;
   clearTimer();
-  stopMusic();
   setBinsDisabled(true);
   statusText.textContent = "You lose";
 
@@ -370,7 +286,6 @@ function restartGame() {
   hideWinScreen();
   updateScore();
   startTimer();
-  startMusic();
   showMessage(
     "Go!",
     `You're playing ${settings.label}. Sort all ${deck.length} items correctly before time runs out.`,
@@ -407,6 +322,7 @@ function saveScore() {
 
   const scores = loadScores();
   scores.push({
+    name: playerName || "Player",
     score,
     difficulty: getSettings().label,
     date: new Date().toLocaleDateString(),
@@ -431,7 +347,7 @@ function renderLeaderboard() {
   }
 
   leaderboardList.innerHTML = scores
-    .map((entry) => `<li>${entry.score} points - ${entry.difficulty} - ${entry.date}</li>`)
+    .map((entry) => `<li>${entry.name} - ${entry.score} points - ${entry.difficulty}</li>`)
     .join("");
 }
 
@@ -449,8 +365,8 @@ function hideWinScreen() {
   winScreen.classList.add("hidden");
 }
 
-function updateMusicButton() {
-  musicButton.textContent = `Music: ${musicEnabled ? "On" : "Off"}`;
+function sanitizePlayerName(value) {
+  return value.trim().replace(/\s+/g, " ").slice(0, 18);
 }
 
 function clearDragHighlights() {
@@ -603,36 +519,29 @@ difficultyButtons.forEach((button) => {
   });
 });
 
-musicButton.addEventListener("click", () => {
-  musicEnabled = !musicEnabled;
-  updateMusicButton();
-
-  if (musicEnabled) {
-    startMusic();
-  } else {
-    stopMusic();
-  }
-});
-
 restartButton.addEventListener("click", restartGame);
 startButton.addEventListener("click", () => {
+  const nextName = sanitizePlayerName(playerNameInput.value);
+
+  if (!nextName) {
+    showMessage("Enter your name", "Type your name before starting so it can show on the leaderboard.", "lose");
+    playerNameInput.focus();
+    return;
+  }
+
+  playerName = nextName;
   hideStartScreen();
   restartGame();
 });
 winPlayAgainButton.addEventListener("click", restartGame);
 
-[bgMusic, correctSfx, wrongSfx, winSfx].forEach((audioElement) => {
-  if (!audioElement) {
-    return;
+playerNameInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    startButton.click();
   }
-
-  audioElement.addEventListener("error", () => {
-    brokenAudioIds.add(audioElement.id);
-  });
 });
 
 document.body.classList.add("locked");
 setDifficulty(selectedDifficulty);
 updateScore();
-updateMusicButton();
 renderLeaderboard();
