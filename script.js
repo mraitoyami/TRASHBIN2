@@ -19,6 +19,7 @@ const winSummary = document.getElementById("win-summary");
 const winPlayAgainButton = document.getElementById("win-play-again");
 const playerNameInput = document.getElementById("player-name");
 const leaderboardList = document.getElementById("leaderboard-list");
+const leaderboardCopy = document.getElementById("leaderboard-copy");
 const dragGhost = document.getElementById("drag-ghost");
 const binButtons = [...document.querySelectorAll(".bin")];
 const difficultyButtons = [...document.querySelectorAll(".difficulty-button")];
@@ -34,6 +35,8 @@ let selectedDifficulty = "easy";
 let dragState = null;
 let playerName = "";
 let itemStartedAt = 0;
+let leaderboardDb = null;
+let leaderboardMode = "local";
 
 const difficultySettings = {
   easy: {
@@ -228,8 +231,7 @@ function handleWin() {
   statusText.textContent = "You win";
   playWinSound();
   pulseCard("celebrate");
-  saveScore();
-  renderLeaderboard();
+  saveScore().then(() => renderLeaderboard());
   showWinScreen();
   showMessage(
     "You cleaned up the whole park!",
@@ -338,7 +340,55 @@ function setDifficulty(nextDifficulty) {
   showMessage("Difficulty selected", `${settings.label} gives you ${settings.time} seconds and +${settings.bonus}s for each correct sort.`);
 }
 
-function loadScores() {
+function updateLeaderboardCopy() {
+  if (leaderboardMode === "remote") {
+    leaderboardCopy.textContent = "Shared leaderboard across devices is live.";
+    return;
+  }
+
+  leaderboardCopy.textContent = "Top scores are saved in your browser on this device.";
+}
+
+function initializeLeaderboardStore() {
+  const config = window.FIREBASE_LEADERBOARD_CONFIG;
+
+  if (!config || !window.firebase || !config.apiKey || !config.projectId) {
+    leaderboardMode = "local";
+    updateLeaderboardCopy();
+    return;
+  }
+
+  try {
+    const app = window.firebase.apps && window.firebase.apps.length
+      ? window.firebase.app()
+      : window.firebase.initializeApp(config);
+
+    leaderboardDb = app.firestore();
+    leaderboardMode = "remote";
+  } catch {
+    leaderboardDb = null;
+    leaderboardMode = "local";
+  }
+
+  updateLeaderboardCopy();
+}
+
+async function loadScores() {
+  if (leaderboardMode === "remote" && leaderboardDb) {
+    try {
+      const snapshot = await leaderboardDb
+        .collection("leaderboard")
+        .orderBy("score", "desc")
+        .limit(10)
+        .get();
+
+      return snapshot.docs.map((doc) => doc.data());
+    } catch {
+      leaderboardMode = "local";
+      updateLeaderboardCopy();
+    }
+  }
+
   try {
     const raw = window.localStorage.getItem("garbage-sorting-leaderboard");
     return raw ? JSON.parse(raw) : [];
@@ -347,22 +397,34 @@ function loadScores() {
   }
 }
 
-function saveScore() {
+async function saveScore() {
   if (score <= 0) {
     return;
   }
 
-  const scores = loadScores();
-  scores.push({
+  const entry = {
     name: playerName || "Player",
     score,
     difficultyKey: selectedDifficulty,
     difficulty: getSettings().label,
     date: new Date().toLocaleDateString(),
-  });
+  };
+
+  if (leaderboardMode === "remote" && leaderboardDb) {
+    try {
+      await leaderboardDb.collection("leaderboard").add(entry);
+      return;
+    } catch {
+      leaderboardMode = "local";
+      updateLeaderboardCopy();
+    }
+  }
+
+  const scores = await loadScores();
+  scores.push(entry);
 
   scores.sort((left, right) => right.score - left.score);
-  const trimmed = scores.slice(0, 5);
+  const trimmed = scores.slice(0, 10);
 
   try {
     window.localStorage.setItem("garbage-sorting-leaderboard", JSON.stringify(trimmed));
@@ -371,8 +433,8 @@ function saveScore() {
   }
 }
 
-function renderLeaderboard() {
-  const scores = loadScores();
+async function renderLeaderboard() {
+  const scores = await loadScores();
 
   if (!scores.length) {
     leaderboardList.innerHTML = "<li>No scores yet.</li>";
@@ -583,6 +645,7 @@ playerNameInput.addEventListener("keydown", (event) => {
 });
 
 document.body.classList.add("locked");
+initializeLeaderboardStore();
 setDifficulty(selectedDifficulty);
 updateScore();
 renderLeaderboard();
