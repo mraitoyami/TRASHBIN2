@@ -32,6 +32,10 @@ button {
   font: inherit;
 }
 
+body.locked {
+  overflow: hidden;
+}
+
 .game-shell {
   width: min(1100px, calc(100% - 2rem));
   margin: 0 auto;
@@ -70,11 +74,30 @@ button {
   margin-bottom: 1.5rem;
 }
 
+.controls-panel {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.difficulty-group {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
 .hud-card,
 .restart-button,
+.difficulty-button,
+.music-button,
 .trash-card,
 .bin,
-.message-panel {
+.message-panel,
+.leaderboard-card,
+.start-card {
   background: var(--panel);
   border: 1px solid rgba(24, 50, 41, 0.08);
   border-radius: 24px;
@@ -104,7 +127,30 @@ button {
   transition: transform 160ms ease, box-shadow 160ms ease;
 }
 
+.difficulty-button,
+.music-button,
+.start-button {
+  border: 0;
+  cursor: pointer;
+  padding: 0.9rem 1.15rem;
+  font-weight: 700;
+  color: var(--text);
+  background: rgba(255, 252, 245, 0.92);
+  transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.difficulty-button.active {
+  background: linear-gradient(135deg, #256647, #4f8f44);
+  color: white;
+}
+
 .restart-button:hover,
+.difficulty-button:hover,
+.difficulty-button:focus-visible,
+.music-button:hover,
+.music-button:focus-visible,
+.start-button:hover,
+.start-button:focus-visible,
 .restart-button:focus-visible,
 .bin:hover,
 .bin:focus-visible {
@@ -128,6 +174,7 @@ button {
 }
 
 .trash-card-inner {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -138,6 +185,8 @@ button {
   border: 2px dashed rgba(24, 50, 41, 0.15);
   background: rgba(255, 255, 255, 0.35);
   transition: transform 180ms ease, background 180ms ease, border-color 180ms ease;
+  touch-action: none;
+  user-select: none;
 }
 
 .trash-card-inner[draggable="true"] {
@@ -212,6 +261,7 @@ button {
 .bin.drag-over {
   outline: 4px solid rgba(255, 255, 255, 0.6);
   outline-offset: -8px;
+  transform: translateY(-2px) scale(1.02);
 }
 
 .bin-emoji {
@@ -250,6 +300,91 @@ button {
 .message-panel.lose {
   border-color: rgba(191, 59, 59, 0.22);
   background: rgba(254, 237, 237, 0.95);
+}
+
+.leaderboard-panel {
+  margin-top: 1.5rem;
+}
+
+.leaderboard-card {
+  padding: 1.2rem 1.4rem;
+}
+
+.leaderboard-card h3,
+.leaderboard-copy {
+  margin: 0;
+}
+
+.leaderboard-copy {
+  margin-top: 0.35rem;
+  color: var(--muted);
+}
+
+.leaderboard-list {
+  margin: 1rem 0 0;
+  padding-left: 1.3rem;
+}
+
+.leaderboard-list li {
+  margin-bottom: 0.45rem;
+}
+
+.start-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(16, 33, 27, 0.45);
+  backdrop-filter: blur(8px);
+  z-index: 30;
+}
+
+.start-screen.hidden {
+  display: none;
+}
+
+.start-card {
+  width: min(560px, 100%);
+  padding: 2rem;
+  text-align: center;
+}
+
+.start-card h2 {
+  margin: 0.4rem 0 0.8rem;
+  font-size: clamp(2rem, 5vw, 3rem);
+}
+
+.start-card p {
+  margin: 0 0 1rem;
+  color: var(--muted);
+  font-size: 1.05rem;
+}
+
+.start-button {
+  background: linear-gradient(135deg, #f7b54a, var(--accent));
+  color: white;
+}
+
+.drag-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  min-width: 120px;
+  padding: 0.9rem 1rem;
+  pointer-events: none;
+  border-radius: 20px;
+  background: rgba(255, 252, 245, 0.96);
+  box-shadow: 0 20px 45px rgba(24, 50, 41, 0.2);
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  z-index: 40;
+  text-align: center;
+}
+
+.drag-ghost.visible {
+  opacity: 1;
 }
 
 .celebrate {
@@ -314,5 +449,15 @@ button {
 
   .hud {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .controls-panel {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .difficulty-group {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
