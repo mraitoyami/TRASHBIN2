@@ -248,16 +248,12 @@ function handleLoss(correctBin) {
   if (correctBin === "time ran out") {
     playWrongSound();
     pulseCard("shake");
-    saveScore();
-    renderLeaderboard();
     showMessage("Time's up!", `You scored ${score} before the timer ended. Press Play Again to try again.`, "lose");
     return;
   }
 
   playWrongSound();
   pulseCard("shake");
-  saveScore();
-  renderLeaderboard();
   showMessage("Wrong bin!", `That item belonged in ${formatBinName(correctBin)}. Press Play Again to try again.`, "lose");
 }
 
@@ -556,7 +552,11 @@ difficultyButtons.forEach((button) => {
   });
 });
 
-restartButton.addEventListener("click", showStartScreen);
+restartButton.addEventListener("click", () => {
+  playerName = "";
+  hideWinScreen();
+  showStartScreen("");
+});
 startButton.addEventListener("click", () => {
   const nextName = sanitizePlayerName(playerNameInput.value);
 
@@ -572,7 +572,8 @@ startButton.addEventListener("click", () => {
 });
 winPlayAgainButton.addEventListener("click", () => {
   hideWinScreen();
-  showStartScreen(playerName);
+  playerName = "";
+  showStartScreen("");
 });
 
 playerNameInput.addEventListener("keydown", (event) => {
