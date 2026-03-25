@@ -1,0 +1,1 @@
+window.FIREBASE_LEADERBOARD_CONFIG = null;
