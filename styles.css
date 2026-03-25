@@ -96,7 +96,7 @@ body.dragging-trash {
 
 .mobile-difficulty-label,
 .difficulty-select {
-  display: none;
+  display: block;
 }
 
 .hud-card,
@@ -413,12 +413,16 @@ body.dragging-trash {
   background: rgba(255, 255, 255, 0.96);
   color: var(--text);
   font: inherit;
+  margin-bottom: 1rem;
 }
 
 .mobile-difficulty-label {
   color: var(--text);
   font-weight: 700;
   font-size: 0.9rem;
+  display: block;
+  margin-bottom: 0.45rem;
+  text-align: left;
 }
 
 .start-button {
@@ -585,6 +589,11 @@ body.dragging-trash {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.55rem;
+  }
+
+  .mobile-difficulty-label,
+  .difficulty-select {
+    display: none;
   }
 
   .hud-card,
