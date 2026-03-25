@@ -365,11 +365,11 @@ function initializeLeaderboardStore() {
   }
 
   try {
-    const app = window.firebase.apps && window.firebase.apps.length
-      ? window.firebase.app()
-      : window.firebase.initializeApp(config);
+    if (!window.firebase.apps || !window.firebase.apps.length) {
+      window.firebase.initializeApp(config);
+    }
 
-    leaderboardDb = app.firestore();
+    leaderboardDb = window.firebase.firestore();
     leaderboardMode = "remote";
   } catch {
     leaderboardDb = null;
