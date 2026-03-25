@@ -33,6 +33,7 @@ let timerId = null;
 let selectedDifficulty = "easy";
 let dragState = null;
 let playerName = "";
+let itemStartedAt = 0;
 
 const difficultySettings = {
   easy: {
@@ -40,18 +41,21 @@ const difficultySettings = {
     time: 75,
     bonus: 4,
     itemCount: 8,
+    speedScore: [180, 140, 110, 90],
   },
   normal: {
     label: "Normal",
     time: 55,
     bonus: 3,
     itemCount: 10,
+    speedScore: [240, 190, 150, 110],
   },
   hard: {
     label: "Hard",
     time: 40,
     bonus: 2,
     itemCount: 12,
+    speedScore: [320, 250, 190, 130],
   },
 };
 
@@ -195,6 +199,25 @@ function renderCurrentItem() {
   trashName.textContent = currentItem.name;
   trashHint.textContent = currentItem.hint;
   statusText.textContent = "Choose the right bin";
+  itemStartedAt = Date.now();
+}
+
+function getPointsForSelection(secondsTaken) {
+  const { speedScore } = getSettings();
+
+  if (secondsTaken <= 1) {
+    return speedScore[0];
+  }
+
+  if (secondsTaken <= 2) {
+    return speedScore[1];
+  }
+
+  if (secondsTaken <= 3) {
+    return speedScore[2];
+  }
+
+  return speedScore[3];
 }
 
 function handleWin() {
@@ -244,13 +267,16 @@ function handleSelection(selectedBin) {
   }
 
   const currentItem = deck[currentIndex];
+  const secondsTaken = Math.max(1, Math.ceil((Date.now() - itemStartedAt) / 1000));
 
   if (selectedBin !== currentItem.bin) {
     handleLoss(currentItem.bin);
     return;
   }
 
-  score += 100;
+  const earnedPoints = getPointsForSelection(secondsTaken);
+
+  score += earnedPoints;
   timeLeft += getSettings().bonus;
   updateScore();
   updateTimer();
@@ -264,7 +290,7 @@ function handleSelection(selectedBin) {
   }
 
   statusText.textContent = "Correct";
-  showMessage("Nice sorting!", "Keep going. One wrong move will end the round.");
+  showMessage("Nice sorting!", `You earned ${earnedPoints} points in ${secondsTaken} second${secondsTaken === 1 ? "" : "s"}.`);
   renderCurrentItem();
 }
 
@@ -334,6 +360,7 @@ function saveScore() {
   scores.push({
     name: playerName || "Player",
     score,
+    difficultyKey: selectedDifficulty,
     difficulty: getSettings().label,
     date: new Date().toLocaleDateString(),
   });
@@ -357,7 +384,7 @@ function renderLeaderboard() {
   }
 
   leaderboardList.innerHTML = scores
-    .map((entry) => `<li>${entry.name} - ${entry.score} points - ${entry.difficulty}</li>`)
+    .map((entry, index) => `<li>${index + 1}. ${entry.name} - ${entry.score} points - ${entry.difficulty}</li>`)
     .join("");
 }
 
