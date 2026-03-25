@@ -109,6 +109,7 @@ body.locked {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+  min-width: 0;
 }
 
 .label,
@@ -335,6 +336,7 @@ body.locked {
 
 .leaderboard-list li {
   margin-bottom: 0.45rem;
+  line-height: 1.4;
 }
 
 .start-screen {
@@ -518,21 +520,195 @@ body.locked {
     grid-template-columns: 1fr;
   }
 
+  .game-shell {
+    width: min(100%, calc(100% - 1rem));
+    padding: 1rem 0 1.5rem;
+  }
+
+  .hero {
+    margin-bottom: 1rem;
+  }
+
+  .hero h1 {
+    font-size: 2.2rem;
+  }
+
+  .subtitle {
+    font-size: 0.98rem;
+  }
+
   .bin {
-    min-height: 170px;
+    min-height: 150px;
+    padding: 1rem 0.9rem;
+    border-radius: 20px;
   }
 
   .hud {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.7rem;
+    margin-bottom: 1rem;
   }
 
   .controls-panel {
     flex-direction: column;
     align-items: stretch;
+    margin-bottom: 1rem;
   }
 
   .difficulty-group {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.55rem;
+  }
+
+  .hud-card,
+  .restart-button,
+  .difficulty-button,
+  .trash-card,
+  .message-panel,
+  .leaderboard-card,
+  .start-card,
+  .win-card {
+    border-radius: 20px;
+  }
+
+  .hud-card,
+  .message-panel,
+  .leaderboard-card,
+  .trash-card {
+    padding: 0.95rem 1rem;
+  }
+
+  .label,
+  .trash-label {
+    font-size: 0.8rem;
+  }
+
+  .restart-button,
+  .difficulty-button,
+  .start-button {
+    width: 100%;
+    padding: 0.9rem 1rem;
+  }
+
+  .trash-card {
+    gap: 0.6rem;
+  }
+
+  .trash-card-inner {
+    padding: 0.85rem 0.7rem;
+    gap: 0.55rem;
+  }
+
+  .trash-emoji {
+    font-size: 3.7rem;
+  }
+
+  .trash-card h2 {
+    font-size: 1.45rem;
+  }
+
+  .trash-hint,
+  .drag-help,
+  .bin-copy,
+  .leaderboard-copy,
+  .start-card p,
+  .win-card p {
+    font-size: 0.92rem;
+  }
+
+  .bins {
+    gap: 0.75rem;
+  }
+
+  .bin::after {
+    width: 58px;
+    height: 58px;
+    border-radius: 16px;
+  }
+
+  .bin-emoji {
+    font-size: 1.8rem;
+  }
+
+  .bin-title {
+    font-size: 1.2rem;
+  }
+
+  .message-panel {
+    margin-top: 1rem;
+  }
+
+  .leaderboard-panel {
+    margin-top: 1rem;
+  }
+
+  .leaderboard-list {
+    margin-top: 0.8rem;
+    padding-left: 1.1rem;
+  }
+
+  .start-screen,
+  .win-screen {
+    padding: 0.9rem;
+  }
+
+  .start-card,
+  .win-card {
+    width: 100%;
+    padding: 1.3rem 1rem;
+  }
+
+  .start-card h2,
+  .win-card h2 {
+    font-size: 2rem;
+  }
+
+  .name-input {
+    padding: 0.9rem;
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .hud {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .hud-card {
+    padding: 0.8rem 0.85rem;
+  }
+
+  .restart-button {
+    grid-column: 1 / -1;
+  }
+
+  .difficulty-group {
+    grid-template-columns: 1fr;
+  }
+
+  .eyebrow {
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+  }
+
+  .hero h1 {
+    font-size: 1.9rem;
+  }
+
+  .subtitle {
+    font-size: 0.9rem;
+  }
+
+  .trash-emoji {
+    font-size: 3.2rem;
+  }
+
+  .bin {
+    min-height: 132px;
+  }
+
+  .bin-copy {
+    font-size: 0.86rem;
   }
 }
