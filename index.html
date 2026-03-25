@@ -65,17 +65,17 @@
 
       <div class="bins" role="group" aria-label="Sorting bins">
         <button class="bin organic" data-bin="organic" type="button">
-          <span class="bin-emoji" aria-hidden="true">🌿</span>
+          <span class="bin-emoji" aria-hidden="true">🍃</span>
           <span class="bin-title">Organic</span>
           <span class="bin-copy">Food scraps and compostable waste</span>
         </button>
         <button class="bin recycle" data-bin="recycle" type="button">
-          <span class="bin-emoji" aria-hidden="true">♻️</span>
+          <span class="bin-emoji" aria-hidden="true">🧃</span>
           <span class="bin-title">Recycle</span>
           <span class="bin-copy">Paper, cans, and clean plastic</span>
         </button>
         <button class="bin landfill" data-bin="landfill" type="button">
-          <span class="bin-emoji" aria-hidden="true">🗑️</span>
+          <span class="bin-emoji" aria-hidden="true">🧻</span>
           <span class="bin-title">Landfill</span>
           <span class="bin-copy">Trash that cannot be recycled</span>
         </button>
@@ -109,7 +109,30 @@
     </div>
   </div>
 
+  <div id="win-screen" class="win-screen hidden">
+    <div class="win-card">
+      <p class="eyebrow">Perfect cleanup</p>
+      <h2>You Win!</h2>
+      <p id="win-summary">You sorted every item correctly.</p>
+      <div class="win-stars" aria-hidden="true">★ ★ ★</div>
+      <button id="win-play-again" class="start-button" type="button">Play Again</button>
+    </div>
+  </div>
+
   <div id="drag-ghost" class="drag-ghost" aria-hidden="true"></div>
+
+  <audio id="bg-music" loop preload="auto">
+    <source src="assets/audio/background-music.mp3" type="audio/mpeg">
+  </audio>
+  <audio id="correct-sfx" preload="auto">
+    <source src="assets/audio/correct.mp3" type="audio/mpeg">
+  </audio>
+  <audio id="wrong-sfx" preload="auto">
+    <source src="assets/audio/wrong.mp3" type="audio/mpeg">
+  </audio>
+  <audio id="win-sfx" preload="auto">
+    <source src="assets/audio/win.mp3" type="audio/mpeg">
+  </audio>
 
   <script src="garbage-data.js"></script>
   <script src="script.js"></script>
