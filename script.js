@@ -1,703 +1,525 @@
-import * as THREE from "https://unpkg.com/three@0.163.0/build/three.module.js";
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
 
-const canvas = document.querySelector("#game");
-const healthFill = document.querySelector("#health-fill");
-const healthText = document.querySelector("#health-text");
-const xpFill = document.querySelector("#xp-fill");
-const xpText = document.querySelector("#xp-text");
-const levelText = document.querySelector("#level-text");
-const enemyText = document.querySelector("#enemy-text");
-const crystalText = document.querySelector("#crystal-text");
-const messageText = document.querySelector("#message-text");
-const gameOverPanel = document.querySelector("#game-over");
-const overlayTitle = document.querySelector("#overlay-title");
-const overlayText = document.querySelector("#overlay-text");
-const restartButton = document.querySelector("#restart-button");
+const healthText = document.getElementById("healthText");
+const crystalText = document.getElementById("crystalText");
+const enemyText = document.getElementById("enemyText");
+const messageText = document.getElementById("messageText");
+const overlay = document.getElementById("overlay");
+const overlayTitle = document.getElementById("overlayTitle");
+const overlayText = document.getElementById("overlayText");
+const restartButton = document.getElementById("restartButton");
 
-const mapRows = [
-  "###############",
-  "#..C.....#....#",
-  "#.###.##.#.##.#",
-  "#.#.....E....##",
-  "#.#.#####.##..#",
-  "#.#.#...#..#C.#",
-  "#...#.P.#..#..#",
-  "###.#.#.##.#.##",
-  "#...#.#....#..#",
-  "#.###.####.#E.#",
-  "#...#....#.#..#",
-  "#.#.####.#.##.#",
-  "#.#....C.#....#",
-  "#...E....#....#",
-  "###############",
+const TILE = 32;
+const MAP = [
+  "####################",
+  "#..C....#......E...#",
+  "#.####..#.#####.##.#",
+  "#......##.....#....#",
+  "#.####....###.#.##.#",
+  "#.#..#.##...#.#....#",
+  "#.#..#..P...#.#.##.#",
+  "#.##.####.#.#.#.##.#",
+  "#....E....#.#.#....#",
+  "###.######.#.#.###.#",
+  "#...#...C..#.#...#.#",
+  "#.#.#.######.###.#.#",
+  "#.#...#....E...#...#",
+  "#.#####.##########.#",
+  "#.....C............#",
+  "####################",
 ];
 
-const tileSize = 4;
-const playerRadius = 0.55;
-const baseFovDistance = 18;
-const fovHalfAngle = THREE.MathUtils.degToRad(34);
-
-const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x04070d, 0.055);
-
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
-
-const ambient = new THREE.HemisphereLight(0x7bb9ff, 0x06090f, 0.6);
-scene.add(ambient);
-
-const moonLight = new THREE.DirectionalLight(0xb9d7ff, 1.2);
-moonLight.position.set(14, 24, 6);
-scene.add(moonLight);
-
-const floorMaterial = new THREE.MeshStandardMaterial({
-  color: 0x152235,
-  roughness: 0.92,
-  metalness: 0.06,
-});
-
-const wallMaterial = new THREE.MeshStandardMaterial({
-  color: 0x30425f,
-  roughness: 0.95,
-  metalness: 0.05,
-});
-
-const enemyMaterial = new THREE.MeshStandardMaterial({
-  color: 0xbf4863,
-  emissive: 0x3e0d18,
-  roughness: 0.55,
-});
-
-const playerMaterial = new THREE.MeshStandardMaterial({
-  color: 0xcbefff,
-  emissive: 0x1f5c7b,
-  roughness: 0.45,
-});
-
-const crystalMaterial = new THREE.MeshStandardMaterial({
-  color: 0x88f0ff,
-  emissive: 0x22556e,
-  transparent: true,
-  opacity: 0.95,
-  roughness: 0.1,
-  metalness: 0.2,
-});
-
-const swordArcMaterial = new THREE.MeshBasicMaterial({
-  color: 0xf8e0a1,
-  transparent: true,
-  opacity: 0.0,
-  side: THREE.DoubleSide,
-});
-
-const world = new THREE.Group();
-scene.add(world);
-
-const tiles = [];
-const walls = [];
-const enemies = [];
-const crystals = [];
-
-const input = {
-  forward: false,
-  back: false,
-  left: false,
-  right: false,
-  sprint: false,
+const WORLD = {
+  width: MAP[0].length,
+  height: MAP.length,
+  pixelWidth: MAP[0].length * TILE,
+  pixelHeight: MAP.length * TILE,
 };
 
-const state = {
-  gameOver: false,
-  victory: false,
-  level: 1,
-  xp: 0,
-  xpToLevel: 60,
-  crystalsCollected: 0,
-  attackCooldown: 0,
-  attackTimer: 0,
-  damageFlash: 0,
-  messageTimer: 0,
-  visibleEnemies: 0,
+const keys = {
+  w: false,
+  a: false,
+  s: false,
+  d: false,
+  shift: false,
 };
 
-const player = {
-  maxHealth: 100,
-  health: 100,
-  speed: 5.8,
-  sprintSpeed: 8.4,
-  facing: new THREE.Vector2(1, 0),
-  position: new THREE.Vector3(),
-  mesh: null,
-  lantern: null,
-  swordArc: null,
-};
+let game;
+let lastTime = 0;
 
-const tmpVec2 = new THREE.Vector2();
-const tmpVec3 = new THREE.Vector3();
+function createGame() {
+  const enemies = [];
+  const crystals = [];
+  let playerStart = { x: 0, y: 0 };
 
-buildWorld();
-setMessage("Wake the lanterns, gather three crystals, and cut through the dark while staying inside your vision cone.");
-updateHud();
-
-const clock = new THREE.Clock();
-animate();
-
-window.addEventListener("resize", onResize);
-window.addEventListener("keydown", onKeyChange);
-window.addEventListener("keyup", onKeyChange);
-restartButton.addEventListener("click", resetGame);
-
-function buildWorld() {
-  const offsetX = -(mapRows[0].length * tileSize) / 2 + tileSize / 2;
-  const offsetZ = -(mapRows.length * tileSize) / 2 + tileSize / 2;
-
-  const floorGeometry = new THREE.BoxGeometry(tileSize, 0.5, tileSize);
-  const wallGeometry = new THREE.BoxGeometry(tileSize, 3.8, tileSize);
-
-  const playerGroup = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.52, 1.2, 6, 12), playerMaterial);
-  body.castShadow = true;
-  body.position.y = 1.1;
-  playerGroup.add(body);
-
-  const lantern = new THREE.SpotLight(0xa8f0ff, 13, baseFovDistance * 1.25, fovHalfAngle * 2.35, 0.34, 1.6);
-  lantern.position.set(0, 2.2, 0);
-  lantern.target.position.set(player.facing.x * 5, 0.5, player.facing.y * 5);
-  playerGroup.add(lantern);
-  playerGroup.add(lantern.target);
-
-  const swordArc = new THREE.Mesh(
-    new THREE.RingGeometry(1.2, 2.5, 32, 1, -Math.PI * 0.32, Math.PI * 0.64),
-    swordArcMaterial
-  );
-  swordArc.rotation.x = -Math.PI / 2;
-  swordArc.position.y = 0.12;
-  playerGroup.add(swordArc);
-
-  player.mesh = playerGroup;
-  player.lantern = lantern;
-  player.swordArc = swordArc;
-  scene.add(playerGroup);
-
-  mapRows.forEach((row, rowIndex) => {
-    tiles[rowIndex] = [];
-
-    [...row].forEach((cell, columnIndex) => {
-      const x = offsetX + columnIndex * tileSize;
-      const z = offsetZ + rowIndex * tileSize;
-
-      const tileMesh = new THREE.Mesh(floorGeometry, floorMaterial.clone());
-      tileMesh.position.set(x, -0.25, z);
-      world.add(tileMesh);
-
-      const tile = {
-        row: rowIndex,
-        col: columnIndex,
-        x,
-        z,
-        mesh: tileMesh,
-      };
-
-      tiles[rowIndex][columnIndex] = tile;
-
-      if (cell === "#") {
-        const wallMesh = new THREE.Mesh(wallGeometry, wallMaterial.clone());
-        wallMesh.position.set(x, 1.9, z);
-        wallMesh.castShadow = true;
-        wallMesh.receiveShadow = true;
-        world.add(wallMesh);
-        walls.push({
-          row: rowIndex,
-          col: columnIndex,
-          mesh: wallMesh,
-        });
-      }
+  for (let row = 0; row < MAP.length; row += 1) {
+    for (let col = 0; col < MAP[row].length; col += 1) {
+      const cell = MAP[row][col];
+      const x = col * TILE + TILE / 2;
+      const y = row * TILE + TILE / 2;
 
       if (cell === "P") {
-        player.position.set(x, 0, z);
-        player.mesh.position.copy(player.position);
+        playerStart = { x, y };
       }
 
       if (cell === "E") {
-        const enemy = createEnemy(x, z);
-        enemies.push(enemy);
-        world.add(enemy.group);
+        enemies.push({
+          x,
+          y,
+          homeX: x,
+          homeY: y,
+          hp: 3,
+          patrolAngle: Math.random() * Math.PI * 2,
+          speed: 54,
+          attackCooldown: 0,
+          alive: true,
+        });
       }
 
       if (cell === "C") {
-        const crystal = createCrystal(x, z);
-        crystals.push(crystal);
-        world.add(crystal.mesh);
-      }
-    });
-  });
-}
-
-function createEnemy(x, z) {
-  const group = new THREE.Group();
-  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.95, 1.9, 7), enemyMaterial.clone());
-  mesh.position.y = 0.95;
-  group.add(mesh);
-
-  const core = new THREE.PointLight(0xff5d77, 1.4, 6, 2);
-  core.position.set(0, 1.6, 0);
-  group.add(core);
-
-  group.position.set(x, 0, z);
-
-  return {
-    group,
-    mesh,
-    core,
-    home: new THREE.Vector2(x, z),
-    position: new THREE.Vector2(x, z),
-    facing: new THREE.Vector2(1, 0),
-    health: 34,
-    speed: 2.3,
-    damageCooldown: 0,
-    aggro: false,
-    visible: false,
-    patrolAngle: Math.random() * Math.PI * 2,
-  };
-}
-
-function createCrystal(x, z) {
-  const mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.8, 0), crystalMaterial.clone());
-  mesh.position.set(x, 1.1, z);
-
-  const aura = new THREE.PointLight(0x74efff, 1.6, 8, 2);
-  aura.position.set(0, 0.2, 0);
-  mesh.add(aura);
-
-  return {
-    mesh,
-    collected: false,
-    bobOffset: Math.random() * Math.PI * 2,
-  };
-}
-
-function onKeyChange(event) {
-  const isDown = event.type === "keydown";
-
-  if (event.code === "KeyW") input.forward = isDown;
-  if (event.code === "KeyS") input.back = isDown;
-  if (event.code === "KeyA") input.left = isDown;
-  if (event.code === "KeyD") input.right = isDown;
-  if (event.code === "ShiftLeft" || event.code === "ShiftRight") input.sprint = isDown;
-
-  if (isDown && event.code === "Space") {
-    event.preventDefault();
-    triggerAttack();
-  }
-
-  if (isDown && event.code === "KeyR") {
-    resetGame();
-  }
-}
-
-function triggerAttack() {
-  if (state.gameOver || state.attackCooldown > 0) {
-    return;
-  }
-
-  state.attackCooldown = 0.55;
-  state.attackTimer = 0.22;
-
-  enemies.forEach((enemy) => {
-    if (enemy.health <= 0) {
-      return;
-    }
-
-    const distance = enemy.position.distanceTo(new THREE.Vector2(player.position.x, player.position.z));
-    if (distance > 3.2) {
-      return;
-    }
-
-    tmpVec2.set(enemy.position.x - player.position.x, enemy.position.y - player.position.z).normalize();
-    const angle = Math.acos(THREE.MathUtils.clamp(tmpVec2.dot(player.facing), -1, 1));
-    if (angle > THREE.MathUtils.degToRad(46)) {
-      return;
-    }
-
-    enemy.health -= 18 + state.level * 4;
-    enemy.aggro = true;
-    enemy.core.intensity = 2.8;
-
-    if (enemy.health <= 0) {
-      enemy.group.visible = false;
-      grantXp(28);
-      setMessage("A shadow falls. Keep pushing deeper into the keep.");
-    }
-  });
-}
-
-function animate() {
-  requestAnimationFrame(animate);
-
-  const delta = Math.min(clock.getDelta(), 0.033);
-
-  if (!state.gameOver) {
-    updatePlayer(delta);
-    updateEnemies(delta);
-    updateCrystals(delta);
-    updateVisibility(delta);
-    updateCombatEffects(delta);
-    updateQuestState();
-  } else {
-    state.attackTimer = Math.max(0, state.attackTimer - delta);
-  }
-
-  updateCamera(delta);
-  renderer.render(scene, camera);
-}
-
-function updatePlayer(delta) {
-  const move = new THREE.Vector2(
-    Number(input.right) - Number(input.left),
-    Number(input.back) - Number(input.forward)
-  );
-
-  if (move.lengthSq() > 0) {
-    move.normalize();
-    player.facing.lerp(new THREE.Vector2(move.x, move.y), 0.18);
-    player.facing.normalize();
-  }
-
-  const speed = input.sprint ? player.sprintSpeed : player.speed;
-  const velocity = move.multiplyScalar(speed * delta * tileSize * 0.36);
-  const targetX = player.position.x + velocity.x;
-  const targetZ = player.position.z + velocity.y;
-
-  if (!collides(targetX, player.position.z, playerRadius)) {
-    player.position.x = targetX;
-  }
-
-  if (!collides(player.position.x, targetZ, playerRadius)) {
-    player.position.z = targetZ;
-  }
-
-  player.mesh.position.set(player.position.x, 0, player.position.z);
-  player.mesh.rotation.y = Math.atan2(player.facing.x, player.facing.y);
-
-  const lanternDistance = baseFovDistance + state.level * 1.2;
-  player.lantern.distance = lanternDistance;
-  player.lantern.intensity = 11 + state.level * 0.9;
-  player.lantern.target.position.set(player.facing.x * 6, 0.4, player.facing.y * 6);
-
-  if (state.attackCooldown > 0) {
-    state.attackCooldown -= delta;
-  }
-}
-
-function updateEnemies(delta) {
-  state.visibleEnemies = 0;
-  const playerPos2 = new THREE.Vector2(player.position.x, player.position.z);
-
-  enemies.forEach((enemy) => {
-    if (enemy.health <= 0) {
-      return;
-    }
-
-    enemy.position.set(enemy.group.position.x, enemy.group.position.z);
-
-    const canSeePlayer = canSeePoint(enemy.position.x, enemy.position.y, player.position.x, player.position.z, 15.5);
-    const distanceToPlayer = enemy.position.distanceTo(playerPos2);
-    enemy.aggro = enemy.aggro || (canSeePlayer && distanceToPlayer < 13);
-    enemy.visible = isPointVisibleToPlayer(enemy.position.x, enemy.position.y);
-
-    if (enemy.visible) {
-      state.visibleEnemies += 1;
-    }
-
-    let moveTarget;
-    if (enemy.aggro && distanceToPlayer > 1.8) {
-      moveTarget = playerPos2;
-    } else if (!enemy.aggro) {
-      enemy.patrolAngle += delta * 0.85;
-      moveTarget = new THREE.Vector2(
-        enemy.home.x + Math.cos(enemy.patrolAngle) * 1.4,
-        enemy.home.y + Math.sin(enemy.patrolAngle) * 1.4
-      );
-    }
-
-    if (moveTarget) {
-      const desired = new THREE.Vector2().subVectors(moveTarget, enemy.position);
-      if (desired.lengthSq() > 0.001) {
-        desired.normalize();
-        enemy.facing.lerp(desired, 0.06);
-        enemy.facing.normalize();
-
-        const nextX = enemy.group.position.x + enemy.facing.x * enemy.speed * delta;
-        const nextZ = enemy.group.position.z + enemy.facing.y * enemy.speed * delta;
-
-        if (!collides(nextX, enemy.group.position.z, 0.6)) {
-          enemy.group.position.x = nextX;
-        }
-        if (!collides(enemy.group.position.x, nextZ, 0.6)) {
-          enemy.group.position.z = nextZ;
-        }
+        crystals.push({
+          x,
+          y,
+          collected: false,
+          bob: Math.random() * Math.PI * 2,
+        });
       }
     }
-
-    enemy.group.rotation.y = Math.atan2(enemy.facing.x, enemy.facing.y);
-
-    enemy.damageCooldown = Math.max(0, enemy.damageCooldown - delta);
-    enemy.core.intensity = THREE.MathUtils.lerp(enemy.core.intensity, enemy.visible ? 1.8 : 0.5, 0.1);
-
-    if (distanceToPlayer < 1.8 && enemy.damageCooldown === 0) {
-      enemy.damageCooldown = 1.1;
-      damagePlayer(9 + state.level);
-    }
-  });
-}
-
-function updateCrystals(delta) {
-  crystals.forEach((crystal, index) => {
-    if (crystal.collected) {
-      return;
-    }
-
-    crystal.mesh.rotation.y += delta * 0.9;
-    crystal.mesh.position.y = 1.1 + Math.sin(clock.elapsedTime * 2 + crystal.bobOffset) * 0.2;
-
-    const distance = Math.hypot(crystal.mesh.position.x - player.position.x, crystal.mesh.position.z - player.position.z);
-    if (distance < 1.3) {
-      crystal.collected = true;
-      crystal.mesh.visible = false;
-      state.crystalsCollected += 1;
-      grantXp(22);
-      setMessage(`Crystal ${state.crystalsCollected} recovered. Your lantern grows brighter.`);
-    }
-
-    const visible = isPointVisibleToPlayer(crystal.mesh.position.x, crystal.mesh.position.z, 20);
-    crystal.mesh.material.emissiveIntensity = visible ? 1.0 : 0.18;
-    crystal.mesh.material.opacity = visible ? 0.95 : 0.22;
-  });
-}
-
-function updateVisibility() {
-  tiles.flat().forEach((tile) => {
-    const visible = isPointVisibleToPlayer(tile.x, tile.z, baseFovDistance + 2);
-    tile.mesh.material.color.setHex(visible ? 0x284263 : 0x152235);
-    tile.mesh.material.emissive.setHex(visible ? 0x12324f : 0x000000);
-    tile.mesh.material.emissiveIntensity = visible ? 0.35 : 0.0;
-  });
-
-  walls.forEach((wall) => {
-    const visible = isPointVisibleToPlayer(
-      wall.mesh.position.x,
-      wall.mesh.position.z,
-      baseFovDistance + 2
-    );
-    wall.mesh.material.color.setHex(visible ? 0x5f7ea6 : 0x30425f);
-    wall.mesh.material.emissive.setHex(visible ? 0x163150 : 0x000000);
-    wall.mesh.material.emissiveIntensity = visible ? 0.22 : 0.0;
-  });
-
-  enemies.forEach((enemy) => {
-    const visible = enemy.health > 0 && enemy.visible;
-    enemy.group.visible = enemy.health > 0 && (visible || enemy.aggro);
-    enemy.mesh.material.transparent = true;
-    enemy.mesh.material.opacity = visible ? 1.0 : 0.18;
-    enemy.core.visible = visible || enemy.aggro;
-  });
-}
-
-function updateCombatEffects(delta) {
-  if (state.attackTimer > 0) {
-    state.attackTimer -= delta;
-    const progress = 1 - state.attackTimer / 0.22;
-    player.swordArc.material.opacity = Math.sin(progress * Math.PI) * 0.72;
-    player.swordArc.rotation.z = THREE.MathUtils.lerp(-0.6, 0.8, progress);
-  } else {
-    player.swordArc.material.opacity = 0;
-    player.swordArc.rotation.z = -0.5;
   }
 
-  state.damageFlash = Math.max(0, state.damageFlash - delta * 2);
-  scene.fog.density = 0.055 + state.damageFlash * 0.028;
-
-  if (state.messageTimer > 0) {
-    state.messageTimer -= delta;
-  }
-}
-
-function updateQuestState() {
-  enemyText.textContent = `${enemies.filter((enemy) => enemy.health > 0).length} (${state.visibleEnemies} in sight)`;
-  crystalText.textContent = `${state.crystalsCollected} / 3`;
-
-  if (!state.victory && state.crystalsCollected >= 3 && enemies.every((enemy) => enemy.health <= 0)) {
-    state.victory = true;
-    endGame(true);
-  }
-}
-
-function updateCamera(delta) {
-  const cameraOffset = new THREE.Vector3(-player.facing.x * 7.8, 10.5, -player.facing.y * 7.8);
-  const cameraTarget = new THREE.Vector3().copy(player.position).add(cameraOffset);
-  camera.position.lerp(cameraTarget, 1 - Math.pow(0.001, delta));
-  tmpVec3.copy(player.position).add(new THREE.Vector3(player.facing.x * 1.6, 1.8, player.facing.y * 1.6));
-  camera.lookAt(tmpVec3);
-}
-
-function damagePlayer(amount) {
-  if (state.gameOver) {
-    return;
-  }
-
-  player.health = Math.max(0, player.health - amount);
-  state.damageFlash = 1;
-  updateHud();
-
-  if (player.health <= 0) {
-    endGame(false);
-  } else {
-    setMessage("The shadows strike from the edge of your light.");
-  }
-}
-
-function grantXp(amount) {
-  state.xp += amount;
-
-  while (state.xp >= state.xpToLevel) {
-    state.xp -= state.xpToLevel;
-    state.level += 1;
-    state.xpToLevel = Math.floor(state.xpToLevel * 1.24);
-    player.maxHealth += 18;
-    player.health = player.maxHealth;
-    setMessage(`Level ${state.level}. Your lantern extends farther into the dark.`);
-  }
-
-  updateHud();
-}
-
-function updateHud() {
-  const hpRatio = player.health / player.maxHealth;
-  healthFill.style.transform = `scaleX(${hpRatio})`;
-  healthText.textContent = `${Math.ceil(player.health)} / ${player.maxHealth}`;
-
-  const xpRatio = state.xp / state.xpToLevel;
-  xpFill.style.transform = `scaleX(${xpRatio})`;
-  xpText.textContent = `${state.xp} / ${state.xpToLevel}`;
-  levelText.textContent = `${state.level}`;
-}
-
-function setMessage(text) {
-  messageText.textContent = text;
-  state.messageTimer = 4;
-}
-
-function endGame(won) {
-  state.gameOver = true;
-  state.victory = won;
-  gameOverPanel.classList.remove("hidden");
-
-  if (won) {
-    overlayTitle.textContent = "Lantern restored.";
-    overlayText.textContent = "You claimed every crystal and cleared the keep. Press R to play again.";
-  } else {
-    overlayTitle.textContent = "The dark got you.";
-    overlayText.textContent = "Your field of view collapsed before the keep did. Press R to enter again.";
-  }
+  return {
+    over: false,
+    won: false,
+    attackTime: 0,
+    message: "Find three crystals and defeat every shadow.",
+    visibleEnemies: 0,
+    player: {
+      x: playerStart.x,
+      y: playerStart.y,
+      radius: 11,
+      hp: 100,
+      maxHp: 100,
+      dirX: 1,
+      dirY: 0,
+      speed: 115,
+      sprint: 168,
+      attackCooldown: 0,
+      crystals: 0,
+    },
+    enemies,
+    crystals,
+  };
 }
 
 function resetGame() {
-  window.location.reload();
+  game = createGame();
+  syncHud();
+  overlay.classList.add("hidden");
 }
 
-function collides(x, z, radius) {
-  const half = tileSize / 2;
-
-  for (const wall of walls) {
-    const wx = wall.mesh.position.x;
-    const wz = wall.mesh.position.z;
-    const closestX = THREE.MathUtils.clamp(x, wx - half, wx + half);
-    const closestZ = THREE.MathUtils.clamp(z, wz - half, wz + half);
-    const dx = x - closestX;
-    const dz = z - closestZ;
-
-    if (dx * dx + dz * dz < radius * radius) {
-      return true;
-    }
-  }
-
-  return false;
+function setMessage(text) {
+  game.message = text;
+  messageText.textContent = text;
 }
 
-function isPointVisibleToPlayer(x, z, overrideDistance = baseFovDistance + state.level * 1.2) {
-  const toPoint = new THREE.Vector2(x - player.position.x, z - player.position.z);
-  const distance = toPoint.length();
+function syncHud() {
+  healthText.textContent = `${Math.max(0, Math.ceil(game.player.hp))} / ${game.player.maxHp}`;
+  crystalText.textContent = `${game.player.crystals} / 3`;
+  enemyText.textContent = `${game.enemies.filter((enemy) => enemy.alive).length} (${game.visibleEnemies} seen)`;
+  messageText.textContent = game.message;
+}
 
-  if (distance === 0) {
+function isWallPixel(x, y) {
+  const col = Math.floor(x / TILE);
+  const row = Math.floor(y / TILE);
+
+  if (col < 0 || row < 0 || col >= WORLD.width || row >= WORLD.height) {
     return true;
   }
 
-  if (distance > overrideDistance) {
-    return false;
-  }
-
-  toPoint.normalize();
-  const angle = Math.acos(THREE.MathUtils.clamp(toPoint.dot(player.facing), -1, 1));
-
-  if (angle > fovHalfAngle) {
-    return false;
-  }
-
-  return !lineBlocked(player.position.x, player.position.z, x, z);
+  return MAP[row][col] === "#";
 }
 
-function canSeePoint(fromX, fromZ, toX, toZ, maxDistance) {
-  const distance = Math.hypot(toX - fromX, toZ - fromZ);
-  if (distance > maxDistance) {
-    return false;
-  }
-
-  return !lineBlocked(fromX, fromZ, toX, toZ);
-}
-
-function lineBlocked(x0, z0, x1, z1) {
-  const steps = Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 0.35);
-
-  for (let step = 1; step < steps; step += 1) {
-    const t = step / steps;
-    const x = THREE.MathUtils.lerp(x0, x1, t);
-    const z = THREE.MathUtils.lerp(z0, z1, t);
-    const grid = worldToGrid(x, z);
-
-    if (!grid) {
-      return true;
-    }
-
-    if (mapRows[grid.row][grid.col] === "#") {
-      return true;
+function circleHitsWall(x, y, radius) {
+  for (let oy = -radius; oy <= radius; oy += radius) {
+    for (let ox = -radius; ox <= radius; ox += radius) {
+      if (isWallPixel(x + ox, y + oy)) {
+        return true;
+      }
     }
   }
 
   return false;
 }
 
-function worldToGrid(x, z) {
-  const width = mapRows[0].length;
-  const height = mapRows.length;
-  const left = -(width * tileSize) / 2;
-  const top = -(height * tileSize) / 2;
+function hasLineOfSight(x1, y1, x2, y2) {
+  const dist = Math.hypot(x2 - x1, y2 - y1);
+  const steps = Math.max(1, Math.ceil(dist / 6));
 
-  const col = Math.floor((x - left) / tileSize);
-  const row = Math.floor((z - top) / tileSize);
-
-  if (row < 0 || row >= height || col < 0 || col >= width) {
-    return null;
+  for (let i = 1; i < steps; i += 1) {
+    const t = i / steps;
+    const x = x1 + (x2 - x1) * t;
+    const y = y1 + (y2 - y1) * t;
+    if (isWallPixel(x, y)) {
+      return false;
+    }
   }
 
-  return { row, col };
+  return true;
 }
 
-function onResize() {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+function isVisibleToPlayer(x, y) {
+  const dx = x - game.player.x;
+  const dy = y - game.player.y;
+  const dist = Math.hypot(dx, dy);
+
+  if (dist > 180) {
+    return false;
+  }
+
+  const normX = dx / (dist || 1);
+  const normY = dy / (dist || 1);
+  const dot = normX * game.player.dirX + normY * game.player.dirY;
+  const angle = Math.acos(Math.max(-1, Math.min(1, dot)));
+
+  if (angle > Math.PI / 4.2) {
+    return false;
+  }
+
+  return hasLineOfSight(game.player.x, game.player.y, x, y);
 }
+
+function update(dt) {
+  if (game.over) {
+    return;
+  }
+
+  const moveX = (keys.d ? 1 : 0) - (keys.a ? 1 : 0);
+  const moveY = (keys.s ? 1 : 0) - (keys.w ? 1 : 0);
+  const moveLen = Math.hypot(moveX, moveY);
+
+  if (moveLen > 0) {
+    const nx = moveX / moveLen;
+    const ny = moveY / moveLen;
+    game.player.dirX = nx;
+    game.player.dirY = ny;
+
+    const speed = keys.shift ? game.player.sprint : game.player.speed;
+    const tryX = game.player.x + nx * speed * dt;
+    const tryY = game.player.y + ny * speed * dt;
+
+    if (!circleHitsWall(tryX, game.player.y, game.player.radius)) {
+      game.player.x = tryX;
+    }
+
+    if (!circleHitsWall(game.player.x, tryY, game.player.radius)) {
+      game.player.y = tryY;
+    }
+  }
+
+  game.player.attackCooldown = Math.max(0, game.player.attackCooldown - dt);
+  game.attackTime = Math.max(0, game.attackTime - dt);
+  game.visibleEnemies = 0;
+
+  for (const crystal of game.crystals) {
+    crystal.bob += dt * 3;
+
+    if (!crystal.collected && Math.hypot(crystal.x - game.player.x, crystal.y - game.player.y) < 18) {
+      crystal.collected = true;
+      game.player.crystals += 1;
+      setMessage(`Crystal ${game.player.crystals} recovered. Your lantern grows stronger.`);
+    }
+  }
+
+  for (const enemy of game.enemies) {
+    if (!enemy.alive) {
+      continue;
+    }
+
+    const dx = game.player.x - enemy.x;
+    const dy = game.player.y - enemy.y;
+    const dist = Math.hypot(dx, dy);
+    const seesPlayer = dist < 220 && hasLineOfSight(enemy.x, enemy.y, game.player.x, game.player.y);
+    const visible = isVisibleToPlayer(enemy.x, enemy.y);
+
+    if (visible) {
+      game.visibleEnemies += 1;
+    }
+
+    let targetX = enemy.homeX + Math.cos(enemy.patrolAngle) * 20;
+    let targetY = enemy.homeY + Math.sin(enemy.patrolAngle) * 20;
+
+    if (seesPlayer) {
+      targetX = game.player.x;
+      targetY = game.player.y;
+    } else {
+      enemy.patrolAngle += dt;
+    }
+
+    const mdx = targetX - enemy.x;
+    const mdy = targetY - enemy.y;
+    const mlen = Math.hypot(mdx, mdy);
+    if (mlen > 1) {
+      const stepX = (mdx / mlen) * enemy.speed * dt;
+      const stepY = (mdy / mlen) * enemy.speed * dt;
+      if (!circleHitsWall(enemy.x + stepX, enemy.y, 10)) {
+        enemy.x += stepX;
+      }
+      if (!circleHitsWall(enemy.x, enemy.y + stepY, 10)) {
+        enemy.y += stepY;
+      }
+    }
+
+    enemy.attackCooldown = Math.max(0, enemy.attackCooldown - dt);
+    if (dist < 20 && enemy.attackCooldown === 0) {
+      enemy.attackCooldown = 0.9;
+      game.player.hp -= 12;
+      setMessage("A shadow hits from the edge of your light.");
+      if (game.player.hp <= 0) {
+        game.player.hp = 0;
+        endGame(false);
+      }
+    }
+  }
+
+  if (game.player.crystals >= 3 && game.enemies.every((enemy) => !enemy.alive)) {
+    endGame(true);
+  }
+
+  syncHud();
+}
+
+function attack() {
+  if (game.over || game.player.attackCooldown > 0) {
+    return;
+  }
+
+  game.player.attackCooldown = 0.35;
+  game.attackTime = 0.16;
+
+  for (const enemy of game.enemies) {
+    if (!enemy.alive) {
+      continue;
+    }
+
+    const dx = enemy.x - game.player.x;
+    const dy = enemy.y - game.player.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 42) {
+      continue;
+    }
+
+    const nx = dx / (dist || 1);
+    const ny = dy / (dist || 1);
+    const dot = nx * game.player.dirX + ny * game.player.dirY;
+    const angle = Math.acos(Math.max(-1, Math.min(1, dot)));
+    if (angle > Math.PI / 3) {
+      continue;
+    }
+
+    enemy.hp -= 1;
+    if (enemy.hp <= 0) {
+      enemy.alive = false;
+      setMessage("A shadow breaks apart.");
+    }
+  }
+}
+
+function endGame(won) {
+  game.over = true;
+  game.won = won;
+  overlay.classList.remove("hidden");
+  overlayTitle.textContent = won ? "Lantern restored." : "You fell in the dark.";
+  overlayText.textContent = won
+    ? "You found every crystal and cleared the dungeon."
+    : "Press R or the button below to try again.";
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const cameraX = Math.max(0, Math.min(game.player.x - canvas.width / 2, WORLD.pixelWidth - canvas.width));
+  const cameraY = Math.max(0, Math.min(game.player.y - canvas.height / 2, WORLD.pixelHeight - canvas.height));
+
+  drawMap(cameraX, cameraY);
+  drawCrystals(cameraX, cameraY);
+  drawEnemies(cameraX, cameraY);
+  drawPlayer(cameraX, cameraY);
+  drawLanternMask(cameraX, cameraY);
+  drawMiniHud();
+}
+
+function drawMap(cameraX, cameraY) {
+  for (let row = 0; row < MAP.length; row += 1) {
+    for (let col = 0; col < MAP[row].length; col += 1) {
+      const x = col * TILE - cameraX;
+      const y = row * TILE - cameraY;
+      const cell = MAP[row][col];
+      const centerX = col * TILE + TILE / 2;
+      const centerY = row * TILE + TILE / 2;
+      const visible = isVisibleToPlayer(centerX, centerY);
+
+      if (cell === "#") {
+        ctx.fillStyle = visible ? "#516a9d" : "#22314e";
+        ctx.fillRect(x, y, TILE, TILE);
+        ctx.fillStyle = visible ? "#6f8cc5" : "#2a3d62";
+        ctx.fillRect(x + 4, y + 4, TILE - 8, TILE - 8);
+      } else {
+        ctx.fillStyle = visible ? "#203457" : "#101b31";
+        ctx.fillRect(x, y, TILE, TILE);
+        ctx.fillStyle = visible ? "#1a2944" : "#0d1528";
+        ctx.fillRect(x + 2, y + 2, TILE - 4, TILE - 4);
+      }
+    }
+  }
+}
+
+function drawCrystals(cameraX, cameraY) {
+  for (const crystal of game.crystals) {
+    if (crystal.collected) {
+      continue;
+    }
+
+    const visible = isVisibleToPlayer(crystal.x, crystal.y);
+    const x = crystal.x - cameraX;
+    const y = crystal.y - cameraY + Math.sin(crystal.bob) * 4;
+
+    ctx.globalAlpha = visible ? 1 : 0.14;
+    ctx.fillStyle = "#78ebff";
+    pixelDiamond(x, y, 10);
+    ctx.fillStyle = "#d9fbff";
+    pixelDiamond(x, y - 3, 4);
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawEnemies(cameraX, cameraY) {
+  for (const enemy of game.enemies) {
+    if (!enemy.alive) {
+      continue;
+    }
+
+    const visible = isVisibleToPlayer(enemy.x, enemy.y);
+    const x = enemy.x - cameraX;
+    const y = enemy.y - cameraY;
+
+    ctx.globalAlpha = visible ? 1 : 0.18;
+    ctx.fillStyle = "#6d2331";
+    ctx.fillRect(Math.round(x - 11), Math.round(y - 10), 22, 22);
+    ctx.fillStyle = "#e45b72";
+    ctx.fillRect(Math.round(x - 8), Math.round(y - 7), 16, 16);
+    ctx.fillStyle = "#ffd7dc";
+    ctx.fillRect(Math.round(x - 4), Math.round(y - 3), 3, 3);
+    ctx.fillRect(Math.round(x + 1), Math.round(y - 3), 3, 3);
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawPlayer(cameraX, cameraY) {
+  const x = game.player.x - cameraX;
+  const y = game.player.y - cameraY;
+  ctx.fillStyle = "#2d6c89";
+  ctx.fillRect(Math.round(x - 11), Math.round(y - 11), 22, 22);
+  ctx.fillStyle = "#99efff";
+  ctx.fillRect(Math.round(x - 8), Math.round(y - 8), 16, 16);
+  ctx.fillStyle = "#fff1d1";
+  ctx.fillRect(Math.round(x - 3), Math.round(y - 3), 6, 6);
+
+  const tipX = x + game.player.dirX * 18;
+  const tipY = y + game.player.dirY * 18;
+  ctx.fillStyle = "#ffe77f";
+  ctx.fillRect(Math.round(tipX - 3), Math.round(tipY - 3), 6, 6);
+
+  if (game.attackTime > 0) {
+    ctx.strokeStyle = "#ffeb9a";
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.arc(x, y, 28, Math.atan2(game.player.dirY, game.player.dirX) - 0.7, Math.atan2(game.player.dirY, game.player.dirX) + 0.7);
+    ctx.stroke();
+  }
+}
+
+function drawLanternMask(cameraX, cameraY) {
+  const x = game.player.x - cameraX;
+  const y = game.player.y - cameraY;
+  const angle = Math.atan2(game.player.dirY, game.player.dirX);
+
+  ctx.save();
+  ctx.fillStyle = "rgba(2, 5, 12, 0.84)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.globalCompositeOperation = "destination-out";
+
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.arc(x, y, 190, angle - 0.78, angle + 0.78);
+  ctx.closePath();
+  ctx.fill();
+
+  const glow = ctx.createRadialGradient(x, y, 12, x, y, 120);
+  glow.addColorStop(0, "rgba(255,255,255,0.95)");
+  glow.addColorStop(0.2, "rgba(255,255,255,0.45)");
+  glow.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(x, y, 120, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawMiniHud() {
+  ctx.fillStyle = "rgba(5, 10, 20, 0.72)";
+  ctx.fillRect(14, 14, 240, 72);
+
+  ctx.fillStyle = "#eff3ff";
+  ctx.font = "16px monospace";
+  ctx.fillText(`HP ${Math.ceil(game.player.hp)}/${game.player.maxHp}`, 28, 38);
+  ctx.fillText(`CRYSTALS ${game.player.crystals}/3`, 28, 60);
+  ctx.fillText(`ENEMIES ${game.enemies.filter((enemy) => enemy.alive).length}`, 28, 82);
+}
+
+function pixelDiamond(x, y, size) {
+  ctx.beginPath();
+  ctx.moveTo(Math.round(x), Math.round(y - size));
+  ctx.lineTo(Math.round(x + size), Math.round(y));
+  ctx.lineTo(Math.round(x), Math.round(y + size));
+  ctx.lineTo(Math.round(x - size), Math.round(y));
+  ctx.closePath();
+  ctx.fill();
+}
+
+function frame(time) {
+  const dt = Math.min(0.033, (time - lastTime) / 1000 || 0);
+  lastTime = time;
+  update(dt);
+  draw();
+  requestAnimationFrame(frame);
+}
+
+window.addEventListener("keydown", (event) => {
+  if (event.code === "KeyW") keys.w = true;
+  if (event.code === "KeyA") keys.a = true;
+  if (event.code === "KeyS") keys.s = true;
+  if (event.code === "KeyD") keys.d = true;
+  if (event.code === "ShiftLeft" || event.code === "ShiftRight") keys.shift = true;
+  if (event.code === "Space") {
+    event.preventDefault();
+    attack();
+  }
+  if (event.code === "KeyR") {
+    resetGame();
+  }
+});
+
+window.addEventListener("keyup", (event) => {
+  if (event.code === "KeyW") keys.w = false;
+  if (event.code === "KeyA") keys.a = false;
+  if (event.code === "KeyS") keys.s = false;
+  if (event.code === "KeyD") keys.d = false;
+  if (event.code === "ShiftLeft" || event.code === "ShiftRight") keys.shift = false;
+});
+
+restartButton.addEventListener("click", resetGame);
+
+resetGame();
+requestAnimationFrame(frame);
