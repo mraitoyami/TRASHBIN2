@@ -12,21 +12,23 @@ const overlayText = document.getElementById("overlayText");
 const restartButton = document.getElementById("restartButton");
 
 const MAP = [
-  "####################",
-  "#....T.....p....T..#",
-  "#..T......T........#",
-  "#..............o...#",
-  "#....#######.......#",
-  "#.T..#.....#...T...#",
-  "#....#.PBG.#.......#",
-  "#....#.....#..T....#",
-  "#....#######.......#",
-  "#..T......p.....T..#",
-  "#..............o...#",
-  "#....T......T......#",
-  "#.........T........#",
-  "#..T...........T...#",
-  "####################",
+  "########################",
+  "#..T...T...T...p...T...#",
+  "#.T....T......T....T...#",
+  "#....T.....o......T....#",
+  "#..T....#####....T...T.#",
+  "#.....T.#HHH#..T.......#",
+  "#..T....#PBG#.....T....#",
+  "#.......#HHH#..T....o..#",
+  "#.T...T.#####.....T....#",
+  "#.....T.....T...T......#",
+  "#..o......T......p..T..#",
+  "#....T........T........#",
+  "#.T.....T...T.....T....#",
+  "#....p......T.....o....#",
+  "#..T....T......T....T..#",
+  "#.......T...T..........#",
+  "########################",
 ];
 
 const TILE = 64;
@@ -134,10 +136,14 @@ function mapCell(col, row) {
   return MAP[row][col];
 }
 
+function isSolidCell(cell) {
+  return cell === "#" || cell === "H";
+}
+
 function isWallAtPixel(x, y) {
   const col = Math.floor(x / TILE);
   const row = Math.floor(y / TILE);
-  return mapCell(col, row) === "#";
+  return isSolidCell(mapCell(col, row));
 }
 
 function normalizeAngle(angle) {
@@ -212,7 +218,12 @@ function castRay(angle) {
     const y = game.player.y + sin * depth;
 
     if (isWallAtPixel(x, y)) {
-      return { distance: depth, hitX: x, hitY: y };
+      return {
+        distance: depth,
+        hitX: x,
+        hitY: y,
+        cell: mapCell(Math.floor(x / TILE), Math.floor(y / TILE)),
+      };
     }
   }
 
@@ -220,6 +231,7 @@ function castRay(angle) {
     distance: MAX_DEPTH * TILE,
     hitX: game.player.x + cos * MAX_DEPTH * TILE,
     hitY: game.player.y + sin * MAX_DEPTH * TILE,
+    cell: "#",
   };
 }
 
@@ -537,16 +549,20 @@ function renderScene() {
 
   ctx.clearRect(0, 0, width, height);
 
-  const sky = ctx.createLinearGradient(0, 0, 0, height * 0.55);
-  sky.addColorStop(0, "#85c7a6");
-  sky.addColorStop(0.55, "#305949");
-  sky.addColorStop(1, "#192f26");
+  const sky = ctx.createLinearGradient(0, 0, 0, height * 0.6);
+  sky.addColorStop(0, "#9bd5b3");
+  sky.addColorStop(0.35, "#5c9d79");
+  sky.addColorStop(0.72, "#274d3f");
+  sky.addColorStop(1, "#173027");
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, width, height * 0.55);
 
+  drawSkyBackdrop(width, height);
+
   const ground = ctx.createLinearGradient(0, height * 0.45, 0, height);
-  ground.addColorStop(0, "#3f4f2f");
-  ground.addColorStop(1, "#1c2415");
+  ground.addColorStop(0, "#53643a");
+  ground.addColorStop(0.52, "#2f3e22");
+  ground.addColorStop(1, "#182112");
   ctx.fillStyle = ground;
   ctx.fillRect(0, height * 0.45, width, height);
 
@@ -561,17 +577,31 @@ function renderScene() {
     const shade = Math.max(0.22, 1 - correctedDistance / (MAX_DEPTH * TILE));
     const edgeFactor = Math.abs((ray.hitX / TILE) % 1) < 0.08 || Math.abs((ray.hitX / TILE) % 1) > 0.92;
 
-    if (correctedDistance < TILE * 2.3) {
-      ctx.fillStyle = edgeFactor
-        ? `rgba(${Math.floor(102 * shade)}, ${Math.floor(85 * shade)}, ${Math.floor(63 * shade)}, 1)`
-        : `rgba(${Math.floor(122 * shade)}, ${Math.floor(103 * shade)}, ${Math.floor(79 * shade)}, 1)`;
+    if (ray.cell === "H") {
+      const r = edgeFactor ? 112 : 136;
+      const g = edgeFactor ? 83 : 101;
+      const b = edgeFactor ? 56 : 66;
+      ctx.fillStyle = `rgba(${Math.floor(r * shade)}, ${Math.floor(g * shade)}, ${Math.floor(b * shade)}, 1)`;
     } else {
-      ctx.fillStyle = edgeFactor
-        ? `rgba(${Math.floor(43 * shade)}, ${Math.floor(62 * shade)}, ${Math.floor(41 * shade)}, 1)`
-        : `rgba(${Math.floor(54 * shade)}, ${Math.floor(78 * shade)}, ${Math.floor(50 * shade)}, 1)`;
+      if (correctedDistance < TILE * 2.3) {
+        ctx.fillStyle = edgeFactor
+          ? `rgba(${Math.floor(58 * shade)}, ${Math.floor(76 * shade)}, ${Math.floor(48 * shade)}, 1)`
+          : `rgba(${Math.floor(72 * shade)}, ${Math.floor(96 * shade)}, ${Math.floor(58 * shade)}, 1)`;
+      } else {
+        ctx.fillStyle = edgeFactor
+          ? `rgba(${Math.floor(39 * shade)}, ${Math.floor(56 * shade)}, ${Math.floor(37 * shade)}, 1)`
+          : `rgba(${Math.floor(48 * shade)}, ${Math.floor(69 * shade)}, ${Math.floor(43 * shade)}, 1)`;
+      }
     }
 
     ctx.fillRect(x, wallTop, 1, wallHeight);
+
+    if (ray.cell === "H") {
+      ctx.fillStyle = `rgba(255, 228, 186, ${0.06 * shade})`;
+      ctx.fillRect(x, wallTop + wallHeight * 0.16, 1, 2);
+      ctx.fillRect(x, wallTop + wallHeight * 0.44, 1, 2);
+      ctx.fillRect(x, wallTop + wallHeight * 0.72, 1, 2);
+    }
   }
 
   renderSprites(bobY);
@@ -579,6 +609,53 @@ function renderScene() {
   renderCrosshair();
   renderMiniMap();
   renderStatusOverlay();
+}
+
+function drawSkyBackdrop(width, height) {
+  ctx.save();
+
+  const sunX = width * 0.78;
+  const sunY = height * 0.16;
+  const sunGlow = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 130);
+  sunGlow.addColorStop(0, "rgba(255, 243, 191, 0.95)");
+  sunGlow.addColorStop(0.45, "rgba(255, 214, 135, 0.3)");
+  sunGlow.addColorStop(1, "rgba(255, 214, 135, 0)");
+  ctx.fillStyle = sunGlow;
+  ctx.beginPath();
+  ctx.arc(sunX, sunY, 130, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(234, 245, 226, 0.82)";
+  ctx.beginPath();
+  ctx.arc(sunX, sunY, 26, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(34, 63, 52, 0.52)";
+  ctx.beginPath();
+  ctx.moveTo(0, height * 0.42);
+  ctx.lineTo(width * 0.18, height * 0.28);
+  ctx.lineTo(width * 0.34, height * 0.4);
+  ctx.lineTo(width * 0.5, height * 0.26);
+  ctx.lineTo(width * 0.7, height * 0.4);
+  ctx.lineTo(width * 0.88, height * 0.22);
+  ctx.lineTo(width, height * 0.38);
+  ctx.lineTo(width, height * 0.55);
+  ctx.lineTo(0, height * 0.55);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(22, 44, 34, 0.74)";
+  for (let i = 0; i < width; i += 26) {
+    const h = 45 + ((i * 13) % 42);
+    ctx.beginPath();
+    ctx.moveTo(i, height * 0.55);
+    ctx.lineTo(i + 12, height * 0.55 - h);
+    ctx.lineTo(i + 26, height * 0.55);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.restore();
 }
 
 function renderSprites(bobY) {
@@ -667,32 +744,58 @@ function drawTreeSprite(left, top, size, distance) {
   ctx.save();
   ctx.globalAlpha = alpha;
 
-  ctx.fillStyle = "#4c2f18";
-  ctx.fillRect(left + size * 0.42, top + size * 0.58, size * 0.16, size * 0.42);
-  ctx.fillStyle = "#1f5e2c";
+  ctx.fillStyle = "rgba(0, 0, 0, 0.18)";
   ctx.beginPath();
-  ctx.arc(left + size * 0.5, top + size * 0.42, size * 0.26, 0, Math.PI * 2);
+  ctx.ellipse(left + size * 0.5, top + size * 0.98, size * 0.22, size * 0.08, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#59371d";
+  ctx.fillRect(left + size * 0.43, top + size * 0.58, size * 0.14, size * 0.42);
+
+  ctx.fillStyle = "#285f2e";
+  ctx.beginPath();
+  ctx.arc(left + size * 0.5, top + size * 0.36, size * 0.24, 0, Math.PI * 2);
   ctx.fill();
   ctx.beginPath();
-  ctx.arc(left + size * 0.36, top + size * 0.5, size * 0.18, 0, Math.PI * 2);
+  ctx.arc(left + size * 0.34, top + size * 0.48, size * 0.19, 0, Math.PI * 2);
   ctx.fill();
   ctx.beginPath();
-  ctx.arc(left + size * 0.64, top + size * 0.5, size * 0.18, 0, Math.PI * 2);
+  ctx.arc(left + size * 0.66, top + size * 0.48, size * 0.19, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#3f8b40";
+  ctx.beginPath();
+  ctx.arc(left + size * 0.5, top + size * 0.28, size * 0.14, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(left + size * 0.4, top + size * 0.38, size * 0.12, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(left + size * 0.6, top + size * 0.38, size * 0.12, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 }
 
 function drawBinSprite(left, top, size, blue) {
   ctx.save();
+  ctx.fillStyle = "rgba(0, 0, 0, 0.18)";
+  ctx.beginPath();
+  ctx.ellipse(left + size * 0.5, top + size * 0.94, size * 0.22, size * 0.07, 0, 0, Math.PI * 2);
+  ctx.fill();
   ctx.fillStyle = blue ? "#4f94ff" : "#48bb73";
   ctx.fillRect(left + size * 0.2, top + size * 0.25, size * 0.6, size * 0.75);
   ctx.fillStyle = blue ? "#a9d0ff" : "#bff0cd";
   ctx.fillRect(left + size * 0.16, top + size * 0.18, size * 0.68, size * 0.12);
+  ctx.fillStyle = "rgba(255,255,255,0.22)";
+  ctx.fillRect(left + size * 0.3, top + size * 0.32, size * 0.12, size * 0.5);
   ctx.restore();
 }
 
 function drawTrashSprite(left, top, size, plastic) {
   ctx.save();
+  ctx.fillStyle = "rgba(0, 0, 0, 0.16)";
+  ctx.beginPath();
+  ctx.ellipse(left + size * 0.5, top + size * 0.84, size * 0.18, size * 0.06, 0, 0, Math.PI * 2);
+  ctx.fill();
   ctx.fillStyle = plastic ? "#e2d18d" : "#8b5f3c";
   ctx.beginPath();
   ctx.arc(left + size * 0.5, top + size * 0.64, size * 0.26, 0, Math.PI * 2);
@@ -709,10 +812,12 @@ function renderWeapon(bobY) {
 
   ctx.fillStyle = "#6d4a2d";
   ctx.fillRect(handleX, handleY, 16, 96);
-  ctx.fillStyle = "#bfb8a3";
+  ctx.fillStyle = "#a59a7f";
   ctx.fillRect(handleX - 34 - swing * 38, handleY - 76, 68, 18);
-  ctx.fillStyle = "#8a8370";
+  ctx.fillStyle = "#7e7661";
   ctx.fillRect(handleX - 10 - swing * 22, handleY - 72, 22, 44);
+  ctx.fillStyle = "rgba(255,255,255,0.22)";
+  ctx.fillRect(handleX - 28 - swing * 30, handleY - 72, 14, 8);
 }
 
 function renderCrosshair() {
