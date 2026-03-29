@@ -3,64 +3,53 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lantern Keep</title>
+  <title>Lantern Knight</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="hud">
-    <div class="hud__brand">
-      <p class="eyebrow">Browser RPG Prototype</p>
-      <h1>Lantern Keep</h1>
-      <p class="subtitle">Explore the ruins, fight shadows, and survive with a narrow field of view.</p>
-    </div>
+  <main class="shell">
+    <section class="panel">
+      <p class="eyebrow">2D Pixel RPG</p>
+      <h1>Lantern Knight</h1>
+      <p class="copy">Clear the dungeon, collect crystals, and survive inside a limited field of view.</p>
 
-    <div class="stats">
-      <div class="stat-card">
-        <span>Health</span>
-        <div class="bar">
-          <div class="bar__fill" id="health-fill"></div>
+      <div class="stats">
+        <div class="stat">
+          <span>Health</span>
+          <strong id="healthText">100 / 100</strong>
         </div>
-        <strong id="health-text">100 / 100</strong>
+        <div class="stat">
+          <span>Crystals</span>
+          <strong id="crystalText">0 / 3</strong>
+        </div>
+        <div class="stat">
+          <span>Enemies</span>
+          <strong id="enemyText">0</strong>
+        </div>
       </div>
 
-      <div class="stat-card">
-        <span>Experience</span>
-        <div class="bar bar--gold">
-          <div class="bar__fill" id="xp-fill"></div>
-        </div>
-        <strong id="xp-text">0 / 60</strong>
+      <div class="controls">
+        <p><kbd>WASD</kbd> move</p>
+        <p><kbd>Space</kbd> attack</p>
+        <p><kbd>Shift</kbd> sprint</p>
+        <p><kbd>R</kbd> restart</p>
       </div>
-    </div>
 
-    <div class="details">
-      <div><span>Level</span><strong id="level-text">1</strong></div>
-      <div><span>Enemies</span><strong id="enemy-text">0</strong></div>
-      <div><span>Crystals</span><strong id="crystal-text">0 / 3</strong></div>
-    </div>
+      <p class="message" id="messageText">Find three crystals and defeat every shadow.</p>
+    </section>
 
-    <div class="tips">
-      <p><kbd>WASD</kbd> move</p>
-      <p><kbd>Shift</kbd> sprint</p>
-      <p><kbd>Space</kbd> slash</p>
-      <p><kbd>R</kbd> restart</p>
-    </div>
-  </div>
+    <section class="game-wrap">
+      <canvas id="game" width="960" height="640" aria-label="Lantern Knight game"></canvas>
+      <div class="overlay hidden" id="overlay">
+        <div class="overlay-card">
+          <h2 id="overlayTitle">You fell in the dark.</h2>
+          <p id="overlayText">Press R to try again.</p>
+          <button id="restartButton" type="button">Restart</button>
+        </div>
+      </div>
+    </section>
+  </main>
 
-  <div class="message-panel">
-    <p class="message-panel__label">Quest Log</p>
-    <p id="message-text">Wake the lanterns, gather three crystals, and cut through the dark while staying inside your vision cone.</p>
-  </div>
-
-  <div id="game-over" class="overlay hidden">
-    <div class="overlay__card">
-      <p class="eyebrow">Run Ended</p>
-      <h2 id="overlay-title">The dark got you.</h2>
-      <p id="overlay-text">Press R to enter the keep again.</p>
-      <button id="restart-button" type="button">Restart Adventure</button>
-    </div>
-  </div>
-
-  <canvas id="game"></canvas>
-  <script type="module" src="script.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>
