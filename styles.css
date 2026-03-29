@@ -1,11 +1,11 @@
 :root {
-  --bg: #0b1020;
-  --panel: #121a30;
-  --panel-2: #182341;
+  --bg: #0d1711;
+  --panel: #152118;
+  --panel-2: #1d2d21;
   --text: #eff3ff;
-  --muted: #94a2c6;
-  --cyan: #8ce7ff;
-  --gold: #ffd46b;
+  --muted: #a4b79f;
+  --cyan: #9be8c3;
+  --gold: #f0d780;
   --red: #ff7b88;
   --green: #87f0a8;
 }
@@ -20,8 +20,8 @@ body {
   font-family: "Trebuchet MS", Verdana, sans-serif;
   color: var(--text);
   background:
-    radial-gradient(circle at top, rgba(82, 131, 255, 0.12), transparent 30%),
-    linear-gradient(180deg, #0a0f1e 0%, #060910 100%);
+    radial-gradient(circle at top, rgba(155, 232, 195, 0.14), transparent 30%),
+    linear-gradient(180deg, #0d1711 0%, #08100b 100%);
 }
 
 .shell {
@@ -35,8 +35,8 @@ body {
 .panel,
 .game-wrap,
 .overlay-card {
-  background: rgba(18, 26, 48, 0.92);
-  border: 1px solid rgba(140, 231, 255, 0.12);
+  background: rgba(21, 33, 24, 0.92);
+  border: 1px solid rgba(155, 232, 195, 0.12);
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
 }
 
@@ -111,7 +111,7 @@ canvas {
   height: auto;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
-  background: #0a1120;
+  background: #0d1711;
 }
 
 .overlay {
