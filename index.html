@@ -9,38 +9,42 @@
 <body>
   <main class="shell">
     <section class="panel">
-      <p class="eyebrow">3D Browser RPG</p>
+      <p class="eyebrow">3D Forest Consequence Game</p>
       <h1>Lantern Knight</h1>
-      <p class="copy">Walk a first-person dungeon, cut through shadows, and survive inside your lantern's field of view.</p>
+      <p class="copy">Protect the forest, manage your base, and watch how every choice changes oxygen, fire risk, and the ending.</p>
 
       <div class="stats">
         <div class="stat">
-          <span>Health</span>
-          <strong id="healthText">100 / 100</strong>
+          <span>Oxygen</span>
+          <strong id="oxygenText">100%</strong>
         </div>
         <div class="stat">
-          <span>Crystals</span>
-          <strong id="crystalText">0 / 3</strong>
+          <span>Fire Risk</span>
+          <strong id="fireText">10%</strong>
         </div>
         <div class="stat">
-          <span>Enemies</span>
-          <strong id="enemyText">0</strong>
+          <span>Eco Score</span>
+          <strong id="scoreText">0</strong>
+        </div>
+        <div class="stat">
+          <span>Carrying</span>
+          <strong id="carryText">Nothing</strong>
         </div>
       </div>
 
       <div class="controls">
-        <p><kbd>W/S</kbd> forward/back</p>
-        <p><kbd>A/D</kbd> turn</p>
-        <p><kbd>Space</kbd> attack</p>
-        <p><kbd>Shift</kbd> strafe</p>
+        <p><kbd>Mouse</kbd> look around</p>
+        <p><kbd>WASD</kbd> move</p>
+        <p><kbd>Space</kbd> cut tree</p>
+        <p><kbd>E</kbd> interact</p>
         <p><kbd>R</kbd> restart</p>
       </div>
 
-      <p class="message" id="messageText">Find three crystals, defeat every shadow, and stay inside the lantern beam.</p>
+      <p class="message" id="messageText">Cutting trees lowers oxygen and raises fire risk. Sort trash correctly at the base to restore the forest.</p>
     </section>
 
     <section class="game-wrap">
-      <canvas id="game" width="960" height="640" aria-label="Lantern Knight 3D game"></canvas>
+      <canvas id="game" width="960" height="640" aria-label="Lantern Knight forest consequence game"></canvas>
       <div class="overlay hidden" id="overlay">
         <div class="overlay-card">
           <h2 id="overlayTitle">You fell in the dark.</h2>
