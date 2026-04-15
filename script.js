@@ -3,6 +3,8 @@ const ctx = canvas.getContext("2d");
 
 const oxygenText = document.getElementById("oxygenText");
 const fireText = document.getElementById("fireText");
+const staminaText = document.getElementById("staminaText");
+const materialText = document.getElementById("materialText");
 const scoreText = document.getElementById("scoreText");
 const carryText = document.getElementById("carryText");
 const messageText = document.getElementById("messageText");
@@ -38,6 +40,8 @@ const TREE_TYPES = {
     fireShield: 1,
     collision: 16,
     size: 0.84,
+    materials: 1,
+    staminaCost: 15,
     cut: { oxygen: -3, fire: 4, score: -2 },
   },
   old: {
@@ -46,6 +50,8 @@ const TREE_TYPES = {
     fireShield: 1.9,
     collision: 20,
     size: 1.18,
+    materials: 3,
+    staminaCost: 24,
     cut: { oxygen: -13, fire: 11, score: -10 },
   },
   glowing: {
@@ -54,6 +60,8 @@ const TREE_TYPES = {
     fireShield: 2.5,
     collision: 18,
     size: 1.02,
+    materials: 2,
+    staminaCost: 20,
     cut: { oxygen: -16, fire: 15, score: -14 },
     blessing: { oxygen: 10, fire: -9, score: 12 },
   },
@@ -95,6 +103,11 @@ const STRAFE_SPEED = 95;
 const TURN_SPEED = 0.0024;
 const INTERACT_RANGE = 1.2;
 const CUT_RANGE = 1.35;
+const BASE_ACTION_RANGE = 1.9;
+const BASE_OXYGEN_COST = 3;
+const BASE_FIREBREAK_COST = 3;
+const MAX_STAMINA = 100;
+const SPRINT_BOOST = 1.5;
 
 const keys = { w: false, a: false, s: false, d: false, shift: false };
 
@@ -155,22 +168,26 @@ function createGame() {
   return {
     over: false,
     ending: "",
-    message: "Click the game to lock your mouse. Old trees hurt the forest badly, glowing trees can bless you, and toxic waste is dangerous on contact.",
+    message: "Click the game to lock your mouse. Cut trees for wood only when survival demands it, then spend that wood at the base before oxygen or heat collapse.",
     prompt: "Click inside the game to start mouse look.",
     attackTimer: 0,
     bob: 0,
     oxygen: 100,
     fireRisk: 10,
+    stamina: 100,
+    materials: 0,
     ecoScore: 0,
     carrying: null,
     visibleTrees: 0,
     pointerLocked: false,
+    sprinting: false,
     totalTrash: trash.length,
     initialTreeCount: trees.length,
     initialForestValue,
     initialFireShield,
     plasticResidue: 0,
     blessingsClaimed: 0,
+    base: { x: startX, y: startY },
     player: { x: startX, y: startY, angle: -Math.PI / 2, radius: 13 },
     trees,
     trash,
@@ -281,6 +298,8 @@ function setMessage(text) {
 function syncHud() {
   oxygenText.textContent = `${Math.max(0, Math.round(game.oxygen))}%`;
   fireText.textContent = `${Math.min(100, Math.round(game.fireRisk))}%`;
+  staminaText.textContent = `${Math.round(game.stamina)}%`;
+  materialText.textContent = `${game.materials} wood`;
   scoreText.textContent = `${Math.round(game.ecoScore)}`;
   carryText.textContent = game.carrying ? getTrashDetails(game.carrying).label : "Nothing";
   messageText.textContent = game.prompt ? `${game.message} ${game.prompt}` : game.message;
@@ -327,6 +346,11 @@ function clampMeters() {
   game.fireRisk = Math.max(0, Math.min(100, game.fireRisk));
 }
 
+function clampSurvival() {
+  game.stamina = Math.max(0, Math.min(MAX_STAMINA, game.stamina));
+  game.materials = Math.max(0, Math.round(game.materials));
+}
+
 function getTreeDetails(tree) {
   return TREE_TYPES[tree.type];
 }
@@ -345,6 +369,21 @@ function applyStatDelta(delta) {
   game.fireRisk += delta.fire ?? 0;
   game.ecoScore += delta.score ?? 0;
   clampMeters();
+}
+
+function spendStamina(amount) {
+  game.stamina -= amount;
+  clampSurvival();
+}
+
+function addMaterials(amount) {
+  game.materials += amount;
+  clampSurvival();
+}
+
+function isNearBase() {
+  const distance = Math.hypot(game.player.x - game.base.x, game.player.y - game.base.y) / TILE;
+  return distance <= BASE_ACTION_RANGE;
 }
 
 function isVisible(x, y) {
@@ -435,29 +474,97 @@ function getTarget(type) {
   return candidates[0]?.object || null;
 }
 
+function useBaseOxygenRig() {
+  if (game.over) return;
+
+  if (game.carrying) {
+    setMessage("Sort what you're carrying before using the base oxygen rig.");
+    syncHud();
+    return;
+  }
+
+  if (!isNearBase()) {
+    setMessage("Get back to the base to spend wood on the oxygen rig.");
+    syncHud();
+    return;
+  }
+
+  if (game.materials < BASE_OXYGEN_COST) {
+    setMessage(`You need ${BASE_OXYGEN_COST} wood to spin up the oxygen rig.`);
+    syncHud();
+    return;
+  }
+
+  addMaterials(-BASE_OXYGEN_COST);
+  applyStatDelta({ oxygen: 15, fire: -3, score: 4 });
+  game.stamina += 10;
+  clampSurvival();
+  setMessage("You feed the oxygen rig with fresh wood. Breath steadies, stamina recovers, and the base clears the air.");
+  syncHud();
+}
+
+function useBaseFirebreak() {
+  if (game.over) return;
+
+  if (game.carrying) {
+    setMessage("Sort what you're carrying before reinforcing the firebreak.");
+    syncHud();
+    return;
+  }
+
+  if (!isNearBase()) {
+    setMessage("You need to be back at the base to reinforce the firebreak.");
+    syncHud();
+    return;
+  }
+
+  if (game.materials < BASE_FIREBREAK_COST) {
+    setMessage(`You need ${BASE_FIREBREAK_COST} wood to reinforce the firebreak.`);
+    syncHud();
+    return;
+  }
+
+  addMaterials(-BASE_FIREBREAK_COST);
+  applyStatDelta({ oxygen: 2, fire: -18, score: 4 });
+  game.stamina += 6;
+  clampSurvival();
+  setMessage("You shore up the firebreak with fresh timber. Heat drops fast, but those trees are gone for good.");
+  syncHud();
+}
+
 function cutTree() {
   if (game.over) return;
 
-  game.attackTimer = 0.16;
   const tree = getTarget("tree");
 
   if (!tree) {
+    game.attackTimer = 0.16;
     setMessage("No tree is lined up in your crosshair.");
     syncHud();
     return;
   }
 
   const details = getTreeDetails(tree);
+  if (game.stamina < details.staminaCost) {
+    game.attackTimer = 0.1;
+    setMessage("Too exhausted to chop. Let stamina recover or stop sprinting for a moment.");
+    syncHud();
+    return;
+  }
+
+  game.attackTimer = 0.16;
+  spendStamina(details.staminaCost);
+  addMaterials(details.materials);
   tree.alive = false;
   applyStatDelta(details.cut);
 
   if (tree.type === "old") {
-    setMessage("You felled an old tree. The forest loses a huge oxygen anchor and fire danger jumps.");
+    setMessage(`You felled an old tree for ${details.materials} wood. The materials help now, but the forest loses a huge oxygen anchor.`);
   } else if (tree.type === "glowing") {
     const lostBlessing = tree.blessingUsed ? " Its blessing was already spent." : " Its unused blessing is gone too.";
-    setMessage(`You cut a glowing tree.${lostBlessing} The lantern canopy collapses and the forest pays for it.`);
+    setMessage(`You cut a glowing tree for ${details.materials} wood.${lostBlessing} The lantern canopy collapses and the forest pays for it.`);
   } else {
-    setMessage("You cut a small tree. The hit is smaller, but every cut still weakens the forest.");
+    setMessage(`You cut a small tree for ${details.materials} wood. The hit is smaller, but every cut still weakens the forest.`);
   }
 
   syncHud();
@@ -549,6 +656,12 @@ function updatePrompt() {
   const glowingTree = getTarget("glowing");
   const trash = getTarget("trash");
   const bin = getTarget("bin");
+  const nearBase = isNearBase();
+
+  if (nearBase && !game.carrying && game.materials >= Math.min(BASE_OXYGEN_COST, BASE_FIREBREAK_COST)) {
+    game.prompt = "At the base: press Q to spend wood on oxygen, or F to reinforce the firebreak and dump heat fast.";
+    return;
+  }
 
   if (glowingTree && !game.carrying) {
     game.prompt = "Press E to claim this glowing tree's blessing. Press Space only if you want a major penalty instead.";
@@ -557,11 +670,11 @@ function updatePrompt() {
 
   if (tree) {
     if (tree.type === "old") {
-      game.prompt = "Press Space to cut this old tree. It causes a huge oxygen loss and pushes fire risk up hard.";
+      game.prompt = "Press Space to cut this old tree for 3 wood. It also causes a huge oxygen loss and pushes fire up hard.";
     } else if (tree.type === "glowing") {
-      game.prompt = "Press Space to cut this glowing tree. Even without its blessing, losing it hits the forest badly.";
+      game.prompt = "Press Space to cut this glowing tree for 2 wood. Even without its blessing, losing it hits the forest badly.";
     } else {
-      game.prompt = "Press Space to cut this small tree. The penalty is minor, but repeated cuts still add up.";
+      game.prompt = "Press Space to cut this small tree for 1 wood. The penalty is smaller, but repeated cuts still add up.";
     }
     return;
   }
@@ -591,7 +704,12 @@ function updatePrompt() {
     return;
   }
 
-  game.prompt = "Use the mouse to look around, WASD to move, Space to cut trees, and E to sort trash or claim glowing-tree blessings.";
+  if (game.stamina < 20) {
+    game.prompt = "Your stamina is low. Ease off sprinting and chopping, or get back to the base before panic takes over.";
+    return;
+  }
+
+  game.prompt = "Use WASD and Shift to manage stamina, cut only when you need wood, and spend materials at the base before oxygen or heat spirals.";
 }
 
 function updateWorld(dt) {
@@ -608,19 +726,26 @@ function updateWorld(dt) {
   );
 
   const blessingSupport = game.blessingsClaimed * 0.04;
+  const oxygenPressure = Math.max(0, 40 - game.oxygen) * 0.014;
+  const heatSnowball = Math.max(0, game.fireRisk - 58) * 0.028;
   const passiveFireRise = (
     (1 - fireShieldRatio) * 1.45 +
     organicPending * 0.14 +
     toxicPending * 0.5 +
     game.plasticResidue * 0.018 -
+    blessingSupport * 0.8 +
+    oxygenPressure +
+    heatSnowball -
     glowingTrees * 0.03 -
-    blessingSupport * 0.8
+    (isNearBase() ? 0.06 : 0)
   ) * dt;
   const passiveOxygenDrift = (
     (forestRatio - 0.58) * 1.4 +
     glowingTrees * 0.05 +
     blessingSupport -
+    0.34 -
     Math.max(0, game.fireRisk - 45) * 0.03 -
+    (game.sprinting ? 0.24 : 0) -
     organicPending * 0.16 -
     toxicPending * 0.42 -
     game.plasticResidue * 0.022
@@ -679,10 +804,21 @@ function update(dt) {
     moveY += Math.sin(game.player.angle + Math.PI / 2) * STRAFE_SPEED * dt;
   }
 
-  if (keys.shift) {
-    moveX *= 1.45;
-    moveY *= 1.45;
+  const hasMovementInput = moveX !== 0 || moveY !== 0;
+  const canSprint = keys.shift && hasMovementInput && game.stamina > 6;
+  game.sprinting = canSprint;
+
+  if (canSprint) {
+    moveX *= SPRINT_BOOST;
+    moveY *= SPRINT_BOOST;
   }
+
+  const exhaustionSlow = game.stamina < 22 ? 0.68 + game.stamina / 70 : 1;
+  const oxygenSlow = game.oxygen < 30 ? 0.82 + game.oxygen / 170 : 1;
+  const heatSlow = game.fireRisk > 72 ? 1 - Math.min(0.22, (game.fireRisk - 72) / 125) : 1;
+  const movementScale = exhaustionSlow * oxygenSlow * heatSlow;
+  moveX *= movementScale;
+  moveY *= movementScale;
 
   const nextX = game.player.x + moveX;
   const nextY = game.player.y + moveY;
@@ -692,6 +828,25 @@ function update(dt) {
 
   for (const tree of game.trees) tree.pulse += dt * 2;
   for (const item of game.trash) item.pulse += dt * 3;
+
+  const movementAmount = Math.hypot(moveX, moveY);
+  const lowOxygenStress = Math.max(0, 35 - game.oxygen) / 35;
+  const heatStress = Math.max(0, game.fireRisk - 55) / 45;
+  const toxicStress = game.carrying?.kind === "toxic" ? 0.35 : 0;
+
+  let staminaDelta = 0;
+  staminaDelta -= (lowOxygenStress * 5.5 + heatStress * 7 + toxicStress * 4) * dt;
+
+  if (game.sprinting) {
+    staminaDelta -= (24 + heatStress * 10 + toxicStress * 7) * dt;
+  } else if (movementAmount > 0.05) {
+    staminaDelta += (4 - lowOxygenStress * 3 - heatStress * 2.5) * dt;
+  } else {
+    staminaDelta += (18 - lowOxygenStress * 8 - heatStress * 6 - toxicStress * 3) * dt;
+  }
+
+  game.stamina += staminaDelta;
+  clampSurvival();
 
   game.attackTimer = Math.max(0, game.attackTimer - dt);
   game.bob += Math.hypot(moveX, moveY) > 0 ? dt * 8 : dt * 2;
@@ -777,6 +932,7 @@ function renderScene() {
   renderWeapon(bobY);
   renderCrosshair();
   renderMiniMap();
+  renderPressureEffects(width, height);
   renderStatusOverlay();
 }
 
@@ -1153,21 +1309,25 @@ function renderMiniMap() {
 
 function renderStatusOverlay() {
   ctx.fillStyle = "rgba(5, 10, 16, 0.68)";
-  ctx.fillRect(16, 16, 290, 86);
+  ctx.fillRect(16, 16, 304, 112);
 
   ctx.fillStyle = "#eff3ff";
   ctx.font = "16px monospace";
   ctx.fillText(`OXYGEN ${Math.round(game.oxygen)}%`, 28, 40);
   ctx.fillText(`FIRE ${Math.round(game.fireRisk)}%`, 28, 62);
-  ctx.fillText(`SCORE ${Math.round(game.ecoScore)}`, 28, 84);
+  ctx.fillText(`STAMINA ${Math.round(game.stamina)}%`, 28, 84);
+  ctx.fillText(`WOOD ${game.materials}   SCORE ${Math.round(game.ecoScore)}`, 28, 106);
 
   ctx.fillStyle = "#21314c";
   ctx.fillRect(328, 22, 200, 14);
   ctx.fillRect(328, 50, 200, 14);
+  ctx.fillRect(328, 78, 200, 14);
   ctx.fillStyle = game.oxygen > 40 ? "#86f0a6" : "#ff9c7c";
   ctx.fillRect(328, 22, 2 * game.oxygen, 14);
   ctx.fillStyle = game.fireRisk < 55 ? "#7fd4ff" : "#ff7b88";
   ctx.fillRect(328, 50, 2 * game.fireRisk, 14);
+  ctx.fillStyle = game.stamina > 35 ? "#f0d780" : "#ffb36f";
+  ctx.fillRect(328, 78, 2 * game.stamina, 14);
 
   if (game.carrying) {
     ctx.fillStyle = "rgba(5, 10, 16, 0.68)";
@@ -1176,6 +1336,47 @@ function renderStatusOverlay() {
     ctx.font = "14px monospace";
     ctx.fillText(`CARRY ${getTrashDetails(game.carrying).label.toUpperCase()}`, canvas.width - 236, 42);
     ctx.font = "16px monospace";
+  }
+}
+
+function renderPressureEffects(width, height) {
+  const oxygenPanic = Math.max(0, 34 - game.oxygen) / 34;
+  const heatPanic = Math.max(0, game.fireRisk - 62) / 38;
+  const staminaPanic = Math.max(0, 22 - game.stamina) / 22;
+
+  if (oxygenPanic > 0) {
+    const vignette = ctx.createRadialGradient(
+      width * 0.5,
+      height * 0.52,
+      width * 0.12,
+      width * 0.5,
+      height * 0.52,
+      width * 0.76
+    );
+    vignette.addColorStop(0, "rgba(0, 0, 0, 0)");
+    vignette.addColorStop(1, `rgba(5, 11, 20, ${0.45 * oxygenPanic})`);
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, width, height);
+  }
+
+  if (heatPanic > 0) {
+    const heatGlow = ctx.createRadialGradient(
+      width * 0.5,
+      height * 0.6,
+      width * 0.1,
+      width * 0.5,
+      height * 0.6,
+      width * 0.9
+    );
+    heatGlow.addColorStop(0, `rgba(255, 132, 86, ${0.05 * heatPanic})`);
+    heatGlow.addColorStop(1, `rgba(255, 68, 41, ${0.28 * heatPanic})`);
+    ctx.fillStyle = heatGlow;
+    ctx.fillRect(0, 0, width, height);
+  }
+
+  if (staminaPanic > 0) {
+    ctx.fillStyle = `rgba(255, 226, 150, ${0.08 * staminaPanic})`;
+    ctx.fillRect(0, height * 0.72, width, height * 0.28);
   }
 }
 
@@ -1223,6 +1424,8 @@ window.addEventListener("keydown", (event) => {
   }
 
   if (event.code === "KeyE") interact();
+  if (event.code === "KeyQ") useBaseOxygenRig();
+  if (event.code === "KeyF") useBaseFirebreak();
   if (event.code === "KeyR") resetGame();
 });
 
