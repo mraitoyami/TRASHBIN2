@@ -28,6 +28,9 @@ const touchChop = document.getElementById("touchChop");
 const touchCraft = document.getElementById("touchCraft");
 const touchPurify = document.getElementById("touchPurify");
 const touchReset = document.getElementById("touchReset");
+const normalModeButton = document.getElementById("normalModeButton");
+const easyModeButton = document.getElementById("easyModeButton");
+const modeText = document.getElementById("modeText");
 
 const MAP = [
   "########################",
@@ -185,14 +188,79 @@ const SPRINT_BOOST = 1.5;
 const FOOD_GOAL = 4;
 const JUNK_RUSH_MAX = 12;
 
+const DIFFICULTY_PRESETS = {
+  normal: {
+    label: "Normal",
+    description: "Balanced and forgiving. Slower decay, easier aiming, and smoother recovery.",
+    startOxygen: 100,
+    startFireRisk: 6,
+    passiveFireScale: 0.45,
+    passiveOxygenScale: 0.45,
+    staminaDrainScale: 0.65,
+    staminaRecoveryScale: 1.2,
+    treePenaltyScale: 0.6,
+    toxicPenaltyScale: 0.55,
+    rewardScale: 1.15,
+    craftPenaltyScale: 0.55,
+    purifierCost: 2,
+    purifierBoostScale: 1.1,
+    weaponCooldownScale: 0.82,
+    movementScale: 1.06,
+    sprintBoost: 1.56,
+    animalRangeBonus: 0.9,
+    animalAimScale: 1.45,
+    interactRangeBonus: 0.5,
+    cutRangeBonus: 0.35,
+    junkRushGainScale: 0.7,
+    animalSpeedScale: 0.86,
+    oxygenSlowFloor: 18,
+    fireSlowCeiling: 88,
+    winOxygenFloor: 8,
+    winFireCeiling: 92,
+    requiredEcoScore: -20,
+  },
+  easy: {
+    label: "Easy",
+    description: "Very relaxed. More recovery, softer penalties, and much easier hunting and cleanup.",
+    startOxygen: 100,
+    startFireRisk: 3,
+    passiveFireScale: 0.28,
+    passiveOxygenScale: 0.28,
+    staminaDrainScale: 0.45,
+    staminaRecoveryScale: 1.45,
+    treePenaltyScale: 0.42,
+    toxicPenaltyScale: 0.35,
+    rewardScale: 1.3,
+    craftPenaltyScale: 0.35,
+    purifierCost: 1,
+    purifierBoostScale: 1.3,
+    weaponCooldownScale: 0.72,
+    movementScale: 1.12,
+    sprintBoost: 1.62,
+    animalRangeBonus: 1.5,
+    animalAimScale: 1.8,
+    interactRangeBonus: 0.75,
+    cutRangeBonus: 0.55,
+    junkRushGainScale: 0.55,
+    animalSpeedScale: 0.72,
+    oxygenSlowFloor: 10,
+    fireSlowCeiling: 94,
+    winOxygenFloor: 1,
+    winFireCeiling: 98,
+    requiredEcoScore: -50,
+  },
+};
+
 const keys = { w: false, a: false, s: false, d: false, shift: false };
 const prefersTouch = window.matchMedia("(hover: none), (pointer: coarse)").matches || navigator.maxTouchPoints > 0;
 const touchLook = { active: false, id: null, lastX: 0, lastY: 0 };
 
 let game;
 let lastFrame = 0;
+let selectedDifficulty = "normal";
 
 function createGame() {
+  const config = DIFFICULTY_PRESETS[selectedDifficulty];
   const trees = [];
   const trash = [];
   const bins = [];
@@ -262,15 +330,17 @@ function createGame() {
   return {
     over: false,
     ending: "",
-    message: "Cut trees only when you need stronger weapons, and choose whether garbage becomes clean recovery or dirty short-term power.",
+    difficulty: selectedDifficulty,
+    message: "Bring back food first, then sort the trash around camp. Upgrade only when you need more range.",
+    messageTimer: 5,
     prompt: prefersTouch
-      ? "Drag the game to look around and use the touch buttons to move, hunt, and interact."
-      : "Click inside the game to start mouse look.",
+      ? "Drag to look and use the touch buttons to move, hunt, and interact."
+      : "Click inside the game to lock the mouse and start playing.",
     attackTimer: 0,
     actionPose: "weapon",
     bob: 0,
-    oxygen: 100,
-    fireRisk: 10,
+    oxygen: config.startOxygen,
+    fireRisk: config.startFireRisk,
     stamina: 100,
     materials: 0,
     recycleParts: 0,
@@ -305,6 +375,31 @@ function createGame() {
     animals,
     depthBuffer: new Array(canvas.width).fill(Infinity),
   };
+}
+
+function getDifficultyConfig(mode = selectedDifficulty) {
+  return DIFFICULTY_PRESETS[mode] || DIFFICULTY_PRESETS.normal;
+}
+
+function scaleSignedValue(value, positiveScale = 1, negativeScale = 1) {
+  if (value > 0) return value * positiveScale;
+  if (value < 0) return value * negativeScale;
+  return value;
+}
+
+function applyDifficultyDelta(delta, positiveScale, negativeScale) {
+  applyStatDelta({
+    oxygen: scaleSignedValue(delta.oxygen ?? 0, positiveScale, negativeScale),
+    fire: scaleSignedValue(delta.fire ?? 0, positiveScale, negativeScale),
+    score: scaleSignedValue(delta.score ?? 0, positiveScale, negativeScale),
+  });
+}
+
+function updateDifficultyUi() {
+  const config = getDifficultyConfig();
+  normalModeButton.classList.toggle("active", selectedDifficulty === "normal");
+  easyModeButton.classList.toggle("active", selectedDifficulty === "easy");
+  modeText.textContent = config.description;
 }
 
 function mapCell(col, row) {
@@ -401,8 +496,9 @@ function castRay(angle) {
   };
 }
 
-function setMessage(text) {
+function setMessage(text, duration = 3.2) {
   game.message = text;
+  game.messageTimer = duration;
   messageText.textContent = text;
 }
 
@@ -433,7 +529,7 @@ function syncHud() {
   recycleText.textContent = `${game.recycleParts}`;
   scoreText.textContent = `${Math.round(game.ecoScore)}`;
   carryText.textContent = game.carrying ? getTrashDetails(game.carrying).label : "Nothing";
-  messageText.textContent = game.prompt ? `${game.message} ${game.prompt}` : game.message;
+  messageText.textContent = game.messageTimer > 0 ? game.message : game.prompt;
 }
 
 function resetGame() {
@@ -447,6 +543,7 @@ function resetGame() {
   touchLook.id = null;
   game = createGame();
   overlay.classList.add("hidden");
+  updateDifficultyUi();
   syncHud();
 }
 
@@ -514,10 +611,19 @@ function getWeaponStats() {
 }
 
 function getEffectiveWeaponCooldown() {
+  const config = getDifficultyConfig(game?.difficulty);
   const base = getWeaponStats().cooldown;
   const junkMultiplier = game.junkRushTimer > 0 ? 0.74 : 1;
-  const lowOxygenPenalty = game.oxygen < 18 ? 1.12 : 1;
-  return base * junkMultiplier * lowOxygenPenalty;
+  const lowOxygenPenalty = game.oxygen < config.oxygenSlowFloor ? 1.08 : 1;
+  return base * config.weaponCooldownScale * junkMultiplier * lowOxygenPenalty;
+}
+
+function getInteractRange() {
+  return INTERACT_RANGE + getDifficultyConfig(game?.difficulty).interactRangeBonus;
+}
+
+function getCutRange() {
+  return CUT_RANGE + getDifficultyConfig(game?.difficulty).cutRangeBonus;
 }
 
 function applyStatDelta(delta) {
@@ -573,6 +679,7 @@ function getTarget(type) {
   const candidates = [];
   const aimAngle = getAimAngle();
   const weapon = getWeaponStats();
+  const config = getDifficultyConfig(game?.difficulty);
 
   if (type === "tree") {
     for (const tree of game.trees) {
@@ -586,7 +693,7 @@ function getTarget(type) {
       const angle = Math.atan2(dy, dx);
       const diff = Math.abs(angleDiff(angle, aimAngle));
 
-      if (distance <= CUT_RANGE && diff < 0.18 && hasLineOfSight(game.player.x, game.player.y, tx, ty)) {
+      if (distance <= getCutRange() && diff < 0.28 && hasLineOfSight(game.player.x, game.player.y, tx, ty)) {
         candidates.push({ object: tree, distance });
       }
     }
@@ -604,7 +711,11 @@ function getTarget(type) {
       const angle = Math.atan2(dy, dx);
       const diff = Math.abs(angleDiff(angle, aimAngle));
 
-      if (distance <= weapon.range && diff < weapon.aimWindow && hasLineOfSight(game.player.x, game.player.y, ax, ay)) {
+      if (
+        distance <= weapon.range + config.animalRangeBonus &&
+        diff < weapon.aimWindow * config.animalAimScale &&
+        hasLineOfSight(game.player.x, game.player.y, ax, ay)
+      ) {
         candidates.push({ object: animal, distance });
       }
     }
@@ -622,7 +733,7 @@ function getTarget(type) {
       const angle = Math.atan2(dy, dx);
       const diff = Math.abs(angleDiff(angle, aimAngle));
 
-      if (distance <= INTERACT_RANGE && diff < 0.22 && hasLineOfSight(game.player.x, game.player.y, tx, ty)) {
+      if (distance <= getInteractRange() && diff < 0.3 && hasLineOfSight(game.player.x, game.player.y, tx, ty)) {
         candidates.push({ object: tree, distance });
       }
     }
@@ -640,7 +751,7 @@ function getTarget(type) {
       const angle = Math.atan2(dy, dx);
       const diff = Math.abs(angleDiff(angle, aimAngle));
 
-      if (distance <= INTERACT_RANGE && diff < 0.24 && hasLineOfSight(game.player.x, game.player.y, tx, ty)) {
+      if (distance <= getInteractRange() && diff < 0.34 && hasLineOfSight(game.player.x, game.player.y, tx, ty)) {
         candidates.push({ object: item, distance });
       }
     }
@@ -656,7 +767,7 @@ function getTarget(type) {
       const angle = Math.atan2(dy, dx);
       const diff = Math.abs(angleDiff(angle, aimAngle));
 
-      if (distance <= INTERACT_RANGE && diff < 0.28 && hasLineOfSight(game.player.x, game.player.y, bx, by)) {
+      if (distance <= getInteractRange() && diff < 0.36 && hasLineOfSight(game.player.x, game.player.y, bx, by)) {
         candidates.push({ object: bin, distance });
       }
     }
@@ -703,6 +814,7 @@ function fireWeapon() {
 
 function craftWeaponUpgrade() {
   if (game.over) return;
+  const config = getDifficultyConfig(game.difficulty);
 
   if (game.carrying) {
     setMessage("Sort what you're carrying before working at the camp bench.");
@@ -734,13 +846,15 @@ function craftWeaponUpgrade() {
   game.weaponLevel = nextLevel;
   game.actionPose = "weapon";
   game.attackTimer = 0.14;
-  applyStatDelta({ oxygen: -1, fire: 2 });
+  applyDifficultyDelta({ oxygen: -1, fire: 2, score: 0 }, config.rewardScale, config.craftPenaltyScale);
   setMessage(`You crafted the ${nextWeapon.name}. Hunting is faster now, but every upgrade remembers which trees paid for it.`);
   syncHud();
 }
 
 function useBasePurifier() {
   if (game.over) return;
+  const config = getDifficultyConfig(game.difficulty);
+  const purifierCost = config.purifierCost;
 
   if (game.carrying) {
     setMessage("Finish sorting what you're carrying before running the recycler purifier.");
@@ -754,16 +868,16 @@ function useBasePurifier() {
     return;
   }
 
-  if (game.recycleParts < PURIFIER_COST) {
-    setMessage(`You need ${PURIFIER_COST} recycle parts from correct sorting to run the purifier.`);
+  if (game.recycleParts < purifierCost) {
+    setMessage(`You need ${purifierCost} recycle parts from correct sorting to run the purifier.`);
     syncHud();
     return;
   }
 
-  addRecycleParts(-PURIFIER_COST);
-  applyStatDelta({ oxygen: 15, fire: -16, score: 7 });
+  addRecycleParts(-purifierCost);
+  applyDifficultyDelta({ oxygen: 15, fire: -16, score: 7 }, config.rewardScale * config.purifierBoostScale, config.toxicPenaltyScale);
   game.junkRushTimer = Math.max(0, game.junkRushTimer - 2);
-  game.stamina += 8;
+  game.stamina += 14;
   clampSurvival();
   setMessage("The recycler purifier spins up on clean-sorted parts. Air clears and wildfire pressure drops, but your dirty combat rush fades.");
   syncHud();
@@ -771,6 +885,7 @@ function useBasePurifier() {
 
 function cutTree() {
   if (game.over) return;
+  const config = getDifficultyConfig(game.difficulty);
 
   const tree = getTarget("tree");
 
@@ -783,7 +898,8 @@ function cutTree() {
   }
 
   const details = getTreeDetails(tree);
-  if (game.stamina < details.staminaCost) {
+  const staminaCost = Math.round(details.staminaCost * (game.difficulty === "easy" ? 0.7 : 0.82));
+  if (game.stamina < staminaCost) {
     game.actionPose = "axe";
     game.attackTimer = 0.1;
     setMessage("Too exhausted to chop. Let stamina recover or stop sprinting for a moment.");
@@ -793,10 +909,10 @@ function cutTree() {
 
   game.actionPose = "axe";
   game.attackTimer = 0.16;
-  spendStamina(details.staminaCost);
+  spendStamina(staminaCost);
   addMaterials(details.materials);
   tree.alive = false;
-  applyStatDelta(details.cut);
+  applyDifficultyDelta(details.cut, config.rewardScale, config.treePenaltyScale);
 
   if (tree.type === "old") {
     setMessage(`You felled an old-growth tree for ${details.materials} wood. That unlocks stronger weapons, but the forest just lost one of its biggest oxygen anchors.`);
@@ -812,13 +928,14 @@ function cutTree() {
 
 function interact() {
   if (game.over) return;
+  const config = getDifficultyConfig(game.difficulty);
 
   if (!game.carrying) {
     const glowingTree = getTarget("glowing");
     if (glowingTree) {
       glowingTree.blessingUsed = true;
       game.blessingsClaimed += 1;
-      applyStatDelta(getTreeDetails(glowingTree).blessing);
+      applyDifficultyDelta(getTreeDetails(glowingTree).blessing, config.rewardScale, config.treePenaltyScale);
       setMessage("The oxygen tree shares a living canopy blessing. Oxygen rises, fire risk eases, and the valley steadies around you.");
       syncHud();
       return;
@@ -836,7 +953,7 @@ function interact() {
 
     if (item.kind === "toxic" && !item.exposed) {
       item.exposed = true;
-      applyStatDelta(getTrashDetails(item).pickupPenalty);
+      applyDifficultyDelta(getTrashDetails(item).pickupPenalty, config.rewardScale, config.toxicPenaltyScale);
       setMessage("You grabbed toxic waste. The fumes hit instantly, so rush it to the hazard bin.");
     } else if (item.kind === "plastic") {
       setMessage("Picked up plastic trash. Leaving plastic around builds long-term damage even after you clean it late.");
@@ -861,7 +978,7 @@ function interact() {
   game.carrying.state = "sorted";
 
   if (correct) {
-    applyStatDelta(trashDetails.correct);
+    applyDifficultyDelta(trashDetails.correct, config.rewardScale, config.toxicPenaltyScale);
     addRecycleParts(trashDetails.correct.parts ?? 0);
     game.junkRushTimer = Math.max(0, game.junkRushTimer - 1.5);
     if (carried.kind === "plastic") {
@@ -873,8 +990,8 @@ function interact() {
       setMessage("Correct choice. The toxic waste is sealed safely and yields the most purifier parts, but none of its volatile power reaches your weapon.");
     }
   } else {
-    applyStatDelta(trashDetails.wrong);
-    game.junkRushTimer = Math.min(JUNK_RUSH_MAX, game.junkRushTimer + (trashDetails.wrong.junk ?? 0));
+    applyDifficultyDelta(trashDetails.wrong, config.rewardScale, config.toxicPenaltyScale);
+    game.junkRushTimer = Math.min(JUNK_RUSH_MAX, game.junkRushTimer + (trashDetails.wrong.junk ?? 0) * config.junkRushGainScale);
     if (carried.kind === "plastic") {
       game.plasticResidue += 1.2;
       setMessage("Wrong choice. The plastic turns into dirty junk-rush power, so your weapon fires faster for a while, but the valley keeps poisoning itself.");
@@ -895,6 +1012,7 @@ function updatePrompt() {
     return;
   }
 
+  const config = getDifficultyConfig(game.difficulty);
   const animal = getTarget("animal");
   const tree = getTarget("tree");
   const glowingTree = getTarget("glowing");
@@ -902,14 +1020,15 @@ function updatePrompt() {
   const bin = getTarget("bin");
   const nearBase = isNearBase();
   const nextWeapon = WEAPON_TIERS[game.weaponLevel + 1];
+  const purifierCost = config.purifierCost;
 
-  if (nearBase && !game.carrying && (nextWeapon || game.recycleParts >= PURIFIER_COST)) {
-    if (nextWeapon && game.materials >= nextWeapon.upgradeCost && game.recycleParts >= PURIFIER_COST) {
-      game.prompt = `At camp: press Q to craft ${nextWeapon.name}, or F to run the recycler purifier with ${PURIFIER_COST} clean parts.`;
+  if (nearBase && !game.carrying && (nextWeapon || game.recycleParts >= purifierCost)) {
+    if (nextWeapon && game.materials >= nextWeapon.upgradeCost && game.recycleParts >= purifierCost) {
+      game.prompt = `At camp: press Q to craft ${nextWeapon.name}, or F to run the purifier with ${purifierCost} clean parts.`;
     } else if (nextWeapon && game.materials >= nextWeapon.upgradeCost) {
-      game.prompt = `At camp: press Q to craft ${nextWeapon.name}. More cutting means faster hunting, but worse forest health.`;
-    } else if (game.recycleParts >= PURIFIER_COST) {
-      game.prompt = "At camp: press F to run the recycler purifier and trade dirty combat rush for cleaner air.";
+      game.prompt = `At camp: press Q to craft ${nextWeapon.name}.`;
+    } else if (game.recycleParts >= purifierCost) {
+      game.prompt = "At camp: press F to run the purifier for a safe oxygen and fire reset boost.";
     }
     return;
   }
@@ -961,19 +1080,21 @@ function updatePrompt() {
   }
 
   if (game.junkRushTimer > 0) {
-    game.prompt = "Dirty rush is active. Your weapon fires faster for a while, but the valley is paying for it.";
+    game.prompt = "Dirty rush is active. Your weapon fires faster for a while.";
     return;
   }
 
   if (game.stamina < 20) {
-    game.prompt = "Your stamina is low. Ease off sprinting and chopping, or get back to the base before panic takes over.";
+    game.prompt = "Your stamina is low. Stop sprinting for a moment and recover.";
     return;
   }
 
-  game.prompt = "Feed the camp, sort every piece of trash, and decide how much of the forest you are willing to spend for faster hunting.";
+  game.prompt = "Hunt food, sort trash, and return to camp to craft or purify when you have materials.";
 }
 
 function updateAnimals(dt, forestRatio) {
+  const config = getDifficultyConfig(game.difficulty);
+
   for (const animal of game.animals) {
     if (!animal.alive) continue;
 
@@ -986,8 +1107,8 @@ function updateAnimals(dt, forestRatio) {
       animal.angle += (Math.random() - 0.5) * 1.8;
     }
 
-    const spook = (1 - forestRatio) * 0.8 + Math.max(0, game.fireRisk - 40) / 120;
-    const speed = details.speed * (1 + spook);
+    const spook = (1 - forestRatio) * 0.45 + Math.max(0, game.fireRisk - 55) / 180;
+    const speed = details.speed * config.animalSpeedScale * (1 + spook);
     const nextX = animal.x * TILE + Math.cos(animal.angle) * speed * dt;
     const nextY = animal.y * TILE + Math.sin(animal.angle) * speed * dt;
     const wanderLimit = TILE * 2.8;
@@ -1005,49 +1126,44 @@ function updateAnimals(dt, forestRatio) {
 }
 
 function updateWorld(dt) {
+  const config = getDifficultyConfig(game.difficulty);
   const forestRatio = getForestValue() / game.initialForestValue;
-  const fireShieldRatio = getFireShieldValue() / game.initialFireShield;
   const glowingTrees = getAliveTreesByType("glowing");
   const plasticPending = getPendingTrashCount("plastic");
   const organicPending = getPendingTrashCount("organic");
   const toxicPending = getPendingTrashCount("toxic");
-  const animalPressure = Math.max(0, FOOD_GOAL - game.food) * 0.03;
 
   updateAnimals(dt, forestRatio);
   game.junkRushTimer = Math.max(0, game.junkRushTimer - dt);
 
   game.plasticResidue = Math.max(
     0,
-    Math.min(24, game.plasticResidue + plasticPending * 0.16 * dt - (plasticPending === 0 ? 0.04 * dt : 0))
+    Math.min(24, game.plasticResidue + plasticPending * 0.08 * dt - (plasticPending === 0 ? 0.12 * dt : 0))
   );
 
-  const blessingSupport = game.blessingsClaimed * 0.04;
-  const oxygenPressure = Math.max(0, 40 - game.oxygen) * 0.014;
-  const heatSnowball = Math.max(0, game.fireRisk - 58) * 0.028;
+  const blessingSupport = game.blessingsClaimed * 0.02;
+  const treeSupport = 0.22 + forestRatio * 0.38 + glowingTrees * 0.035 + blessingSupport;
+  const trashPressure =
+    plasticPending * 0.12 +
+    organicPending * 0.18 +
+    toxicPending * 0.36 +
+    game.plasticResidue * 0.05;
+  const baseShelter = isNearBase() ? 0.08 : 0;
+
   const passiveFireRise = (
-    (1 - fireShieldRatio) * 1.45 +
-    organicPending * 0.14 +
-    toxicPending * 0.5 +
-    game.plasticResidue * 0.018 -
-    Math.min(0.25, game.recycleParts * 0.03) +
-    oxygenPressure +
-    heatSnowball -
-    blessingSupport * 0.8 -
-    glowingTrees * 0.03 -
-    (isNearBase() ? 0.06 : 0)
-  ) * dt;
+    (1 - forestRatio) * 0.45 +
+    trashPressure * 0.24 +
+    Math.max(0, game.fireRisk - 72) * 0.018 -
+    treeSupport * 0.42 -
+    baseShelter
+  ) * config.passiveFireScale * dt;
   const passiveOxygenDrift = (
-    (forestRatio - 0.58) * 1.4 +
-    glowingTrees * 0.05 +
-    blessingSupport -
-    0.34 -
-    Math.max(0, game.fireRisk - 45) * 0.03 -
-    (game.sprinting ? 0.24 : 0) -
-    animalPressure -
-    organicPending * 0.16 -
-    toxicPending * 0.42 -
-    game.plasticResidue * 0.022
-  ) * dt;
+    treeSupport * 0.55 -
+    0.24 -
+    trashPressure * 0.18 -
+    Math.max(0, game.fireRisk - 65) * 0.012 -
+    (game.sprinting ? 0.05 : 0)
+  ) * config.passiveOxygenScale * dt;
 
   game.fireRisk += passiveFireRise;
   game.oxygen += passiveOxygenDrift;
@@ -1069,14 +1185,18 @@ function updateWorld(dt) {
   }
 
   if (getHandledTrashCount() === game.totalTrash && game.food >= FOOD_GOAL && !game.carrying) {
-    if (game.ecoScore >= 10 && game.oxygen >= 48 && game.fireRisk <= 65) {
+    if (
+      game.ecoScore >= config.requiredEcoScore &&
+      game.oxygen >= config.winOxygenFloor &&
+      game.fireRisk <= config.winFireCeiling
+    ) {
       if (getAliveTreesByType("glowing") > 0 || game.blessingsClaimed > 0) {
         endGame(true, "The camp survives. You fed everyone, cleaned the valley, and left enough living canopy for the forest to keep breathing.");
       } else {
         endGame(true, "The camp survives, but every oxygen tree is gone. You won with a harsher, thinner future hanging over the valley.");
       }
     } else {
-      endGame(false, "You met the short-term goals, but the combination of hunting pressure, bad sorting, and tree loss left the valley unstable.");
+      endGame(false, "You finished the tasks, but the camp was still too unstable. Try running the purifier or keeping a few more trees standing.");
     }
   }
 }
@@ -1084,41 +1204,43 @@ function updateWorld(dt) {
 function update(dt) {
   if (game.over) return;
 
-  let moveX = 0;
-  let moveY = 0;
+  const config = getDifficultyConfig(game.difficulty);
+  let forwardInput = 0;
+  let strafeInput = 0;
 
-  if (keys.w) {
-    moveX += Math.cos(game.player.angle) * MOVE_SPEED * dt;
-    moveY += Math.sin(game.player.angle) * MOVE_SPEED * dt;
+  if (keys.w) forwardInput += 1;
+  if (keys.s) forwardInput -= 1;
+  if (keys.d) strafeInput += 1;
+  if (keys.a) strafeInput -= 1;
+
+  const hasMovementInput = forwardInput !== 0 || strafeInput !== 0;
+  if (hasMovementInput) {
+    const inputLength = Math.hypot(forwardInput, strafeInput) || 1;
+    forwardInput /= inputLength;
+    strafeInput /= inputLength;
   }
 
-  if (keys.s) {
-    moveX -= Math.cos(game.player.angle) * MOVE_SPEED * dt;
-    moveY -= Math.sin(game.player.angle) * MOVE_SPEED * dt;
-  }
+  let moveX =
+    (Math.cos(game.player.angle) * forwardInput * MOVE_SPEED * config.movementScale +
+      Math.cos(game.player.angle + Math.PI / 2) * strafeInput * STRAFE_SPEED * config.movementScale) *
+    dt;
+  let moveY =
+    (Math.sin(game.player.angle) * forwardInput * MOVE_SPEED * config.movementScale +
+      Math.sin(game.player.angle + Math.PI / 2) * strafeInput * STRAFE_SPEED * config.movementScale) *
+    dt;
 
-  if (keys.a) {
-    moveX += Math.cos(game.player.angle - Math.PI / 2) * STRAFE_SPEED * dt;
-    moveY += Math.sin(game.player.angle - Math.PI / 2) * STRAFE_SPEED * dt;
-  }
-
-  if (keys.d) {
-    moveX += Math.cos(game.player.angle + Math.PI / 2) * STRAFE_SPEED * dt;
-    moveY += Math.sin(game.player.angle + Math.PI / 2) * STRAFE_SPEED * dt;
-  }
-
-  const hasMovementInput = moveX !== 0 || moveY !== 0;
-  const canSprint = keys.shift && hasMovementInput && game.stamina > 6;
+  const canSprint = keys.shift && hasMovementInput && game.stamina > 8;
   game.sprinting = canSprint;
 
   if (canSprint) {
-    moveX *= SPRINT_BOOST;
-    moveY *= SPRINT_BOOST;
+    moveX *= config.sprintBoost;
+    moveY *= config.sprintBoost;
   }
 
-  const exhaustionSlow = game.stamina < 22 ? 0.68 + game.stamina / 70 : 1;
-  const oxygenSlow = game.oxygen < 30 ? 0.82 + game.oxygen / 170 : 1;
-  const heatSlow = game.fireRisk > 72 ? 1 - Math.min(0.22, (game.fireRisk - 72) / 125) : 1;
+  const exhaustionSlow = game.stamina < 14 ? 0.78 + game.stamina / 64 : 1;
+  const oxygenSlow = game.oxygen < config.oxygenSlowFloor ? 0.86 + game.oxygen / 120 : 1;
+  const heatSlow =
+    game.fireRisk > config.fireSlowCeiling ? 1 - Math.min(0.15, (game.fireRisk - config.fireSlowCeiling) / 100) : 1;
   const movementScale = exhaustionSlow * oxygenSlow * heatSlow;
   moveX *= movementScale;
   moveY *= movementScale;
@@ -1133,19 +1255,19 @@ function update(dt) {
   for (const item of game.trash) item.pulse += dt * 3;
 
   const movementAmount = Math.hypot(moveX, moveY);
-  const lowOxygenStress = Math.max(0, 35 - game.oxygen) / 35;
-  const heatStress = Math.max(0, game.fireRisk - 55) / 45;
-  const toxicStress = game.carrying?.kind === "toxic" ? 0.35 : 0;
+  const lowOxygenStress = Math.max(0, config.oxygenSlowFloor - game.oxygen) / Math.max(1, config.oxygenSlowFloor);
+  const heatStress = Math.max(0, game.fireRisk - 70) / 30;
+  const toxicStress = game.carrying?.kind === "toxic" ? 0.16 : 0;
 
   let staminaDelta = 0;
-  staminaDelta -= (lowOxygenStress * 5.5 + heatStress * 7 + toxicStress * 4) * dt;
+  staminaDelta -= (lowOxygenStress * 3 + heatStress * 4 + toxicStress * 2) * config.staminaDrainScale * dt;
 
   if (game.sprinting) {
-    staminaDelta -= (24 + heatStress * 10 + toxicStress * 7) * dt;
+    staminaDelta -= (16 + heatStress * 6 + toxicStress * 3) * config.staminaDrainScale * dt;
   } else if (movementAmount > 0.05) {
-    staminaDelta += (4 - lowOxygenStress * 3 - heatStress * 2.5) * dt;
+    staminaDelta += (6 - lowOxygenStress * 2 - heatStress * 1.5) * config.staminaRecoveryScale * dt;
   } else {
-    staminaDelta += (18 - lowOxygenStress * 8 - heatStress * 6 - toxicStress * 3) * dt;
+    staminaDelta += (16 - lowOxygenStress * 3 - heatStress * 2 - toxicStress) * config.staminaRecoveryScale * dt;
   }
 
   game.stamina += staminaDelta;
@@ -1153,7 +1275,8 @@ function update(dt) {
 
   game.attackTimer = Math.max(0, game.attackTimer - dt);
   game.weaponCooldown = Math.max(0, game.weaponCooldown - dt);
-  game.bob += Math.hypot(moveX, moveY) > 0 ? dt * 8 : dt * 2;
+  game.messageTimer = Math.max(0, game.messageTimer - dt);
+  game.bob += movementAmount > 0 ? dt * 6 : dt * 1.5;
 
   updateWorld(dt);
   updatePrompt();
@@ -1814,7 +1937,8 @@ function renderStatusOverlay() {
   const sideX = compact ? 16 : mainX + mainW + 14;
   const sideY = compact ? mainY + mainH + 12 : 16;
   const sideW = compact ? Math.min(canvas.width - 32, 240) : 232;
-  const sideH = compact ? 90 : 118;
+  const sideH = compact ? 86 : 108;
+  const config = getDifficultyConfig(game.difficulty);
 
   drawHudBlock(mainX, mainY, mainW, mainH);
   drawHudMeter(mainX + 12, mainY + 18, mainW - 24, "OXYGEN", game.oxygen, game.oxygen > 40 ? "#86f0a6" : "#ff9c7c");
@@ -1824,15 +1948,14 @@ function renderStatusOverlay() {
   drawHudBlock(sideX, sideY, sideW, sideH);
   ctx.fillStyle = "#eff3ff";
   ctx.font = compact ? "13px monospace" : "14px monospace";
-  ctx.fillText(`WOOD ${game.materials}`, sideX + 12, sideY + 24);
-  ctx.fillText(`PARTS ${game.recycleParts}`, sideX + 12, sideY + 44);
-  ctx.fillText(`FOOD ${game.food}/${FOOD_GOAL}`, sideX + 12, sideY + 64);
-  if (!compact) ctx.fillText(`WILDLIFE ${getLiveAnimalCount()}`, sideX + 12, sideY + 84);
-  ctx.fillText(`SCORE ${Math.round(game.ecoScore)}`, sideX + sideW * 0.5, sideY + 24);
+  ctx.fillText(`FOOD ${game.food}/${FOOD_GOAL}`, sideX + 12, sideY + 24);
+  ctx.fillText(`WOOD ${game.materials}`, sideX + 12, sideY + 44);
+  ctx.fillText(`PARTS ${game.recycleParts}`, sideX + 12, sideY + 64);
+  ctx.fillText(`MODE ${config.label.toUpperCase()}`, sideX + sideW * 0.5, sideY + 24);
   ctx.fillText(`RATE ${(1 / getEffectiveWeaponCooldown()).toFixed(1)}/SEC`, sideX + sideW * 0.5, sideY + 44);
   ctx.fillText("WEAPON", sideX + sideW * 0.5, sideY + 64);
   ctx.font = compact ? "12px monospace" : "13px monospace";
-  ctx.fillText(getWeaponStats().name.toUpperCase(), sideX + sideW * 0.5, sideY + (compact ? 82 : 84));
+  ctx.fillText(getWeaponStats().name.toUpperCase(), sideX + sideW * 0.5, sideY + (compact ? 80 : 84));
 
   let chipY = sideY + sideH + 12;
   if (game.junkRushTimer > 0) {
@@ -1870,7 +1993,7 @@ function renderPressureEffects(width, height) {
       width * 0.76
     );
     vignette.addColorStop(0, "rgba(0, 0, 0, 0)");
-    vignette.addColorStop(1, `rgba(5, 11, 20, ${0.45 * oxygenPanic})`);
+    vignette.addColorStop(1, `rgba(5, 11, 20, ${0.22 * oxygenPanic})`);
     ctx.fillStyle = vignette;
     ctx.fillRect(0, 0, width, height);
   }
@@ -1884,14 +2007,14 @@ function renderPressureEffects(width, height) {
       height * 0.6,
       width * 0.9
     );
-    heatGlow.addColorStop(0, `rgba(255, 132, 86, ${0.05 * heatPanic})`);
-    heatGlow.addColorStop(1, `rgba(255, 68, 41, ${0.28 * heatPanic})`);
+    heatGlow.addColorStop(0, `rgba(255, 132, 86, ${0.03 * heatPanic})`);
+    heatGlow.addColorStop(1, `rgba(255, 68, 41, ${0.16 * heatPanic})`);
     ctx.fillStyle = heatGlow;
     ctx.fillRect(0, 0, width, height);
   }
 
   if (staminaPanic > 0) {
-    ctx.fillStyle = `rgba(255, 226, 150, ${0.08 * staminaPanic})`;
+    ctx.fillStyle = `rgba(255, 226, 150, ${0.04 * staminaPanic})`;
     ctx.fillRect(0, height * 0.72, width, height * 0.28);
   }
 }
@@ -1958,6 +2081,13 @@ function bindActionButton(element, action) {
     event.preventDefault();
     action();
   });
+}
+
+function setDifficulty(mode) {
+  if (!DIFFICULTY_PRESETS[mode]) return;
+  selectedDifficulty = mode;
+  updateDifficultyUi();
+  resetGame();
 }
 
 document.addEventListener("pointerlockchange", () => {
@@ -2083,10 +2213,13 @@ bindActionButton(touchCraft, craftWeaponUpgrade);
 bindActionButton(touchPurify, useBasePurifier);
 bindActionButton(touchReset, resetGame);
 
+normalModeButton.addEventListener("click", () => setDifficulty("normal"));
+easyModeButton.addEventListener("click", () => setDifficulty("easy"));
 restartButton.addEventListener("click", resetGame);
 window.addEventListener("resize", resizeCanvas);
 window.addEventListener("orientationchange", resizeCanvas);
 
+updateDifficultyUi();
 resizeCanvas();
 resetGame();
 requestAnimationFrame(frame);
