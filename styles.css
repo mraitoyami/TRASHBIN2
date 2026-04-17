@@ -94,6 +94,48 @@ h1 {
   line-height: 1.5;
 }
 
+.difficulty {
+  margin-top: 18px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--panel-2);
+  border: 1px solid rgba(217, 235, 190, 0.08);
+}
+
+.difficulty-label {
+  display: block;
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.difficulty-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.mode-button {
+  flex: 1;
+  padding: 10px 14px;
+  font-size: 0.95rem;
+  color: var(--mist);
+  background: rgba(15, 24, 16, 0.95);
+  border: 1px solid rgba(217, 235, 190, 0.14);
+}
+
+.mode-button.active {
+  color: #15200f;
+  background: linear-gradient(135deg, #d2eb9f, #8fd4b1);
+}
+
+.difficulty-copy {
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
 .stats,
 .controls {
   display: grid;
@@ -312,4 +354,3 @@ kbd {
     display: flex;
   }
 }
-
