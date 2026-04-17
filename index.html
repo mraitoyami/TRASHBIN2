@@ -2210,7 +2210,6 @@ function endLevel(){
   if(pendingRewards.length<4){
     pendingRewards=[...PARK_REWARDS].sort(()=>Math.random()-.5).slice(0,4);
   }
-  saveHi(score,currentLevel);
 }
 
 function goToReward(){
@@ -2296,6 +2295,7 @@ function showParkScreen(){
 
 function parkContinue(){
   if(completedLevels.size>=5){
+    saveHi(score,5);
     showCertificate();
   } else {
     updateLevelSelect();
@@ -2477,7 +2477,7 @@ async function openHi(){
       const data=await r.json();
       if(data && typeof data==='object' && !Array.isArray(data)){
         const rows=Object.values(data)
-          .filter(x=>x&&typeof x==='object')
+          .filter(x=>x&&typeof x==='object'&&(x.level===5||x.level==='5'))
           .sort((a,b)=>(b.score||0)-(a.score||0));
         renderHiRows(rows); return;
       }
@@ -2485,11 +2485,11 @@ async function openHi(){
     }catch(e){
       console.error('Firebase error:',e);
       const hs=JSON.parse(localStorage.getItem('rssHS3')||'[]');
-      renderHiRows(hs.map(h=>({name:h.name,score:h.s,level:h.lv})));
+      renderHiRows(hs.filter(h=>h.lv===5||h.lv==='5').map(h=>({name:h.name,score:h.s,level:h.lv})));
     }
   } else {
     const hs=JSON.parse(localStorage.getItem('rssHS3')||'[]');
-    renderHiRows(hs.map(h=>({name:h.name,score:h.s,level:h.lv})));
+    renderHiRows(hs.filter(h=>h.lv===5||h.lv==='5').map(h=>({name:h.name,score:h.s,level:h.lv})));
   }
 }
 
