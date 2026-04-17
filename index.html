@@ -7,26 +7,34 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="crosshair" aria-hidden="true"></div>
+
     <div id="hud">
-      <h1>Eco Survival 3D</h1>
-      <p>Move: WASD | Look: Mouse drag | Action: E</p>
-      <div class="stats-grid">
-        <div>Health: <span id="health">100</span></div>
-        <div>Stamina: <span id="stamina">100</span></div>
-        <div>Food: <span id="food">0</span></div>
-        <div>Weapon Lv: <span id="weaponLevel">1</span></div>
-        <div>Fire Rate: <span id="fireRate">1.00</span></div>
-        <div>Oxygen: <span id="oxygen">50</span></div>
-        <div>Pollution: <span id="pollution">50</span></div>
-        <div>Forest: <span id="forestDensity">50</span></div>
-        <div>Eco Points: <span id="ecoPoints">0</span></div>
-        <div>Day: <span id="day">1</span></div>
+      <div class="bar-row">
+        <span>Health</span>
+        <div class="bar"><div id="healthFill" class="fill health"></div></div>
+        <span id="healthText">100</span>
       </div>
-      <p id="hint">Walk close to trees, bins, or animals and press E.</p>
-      <p id="message"></p>
+      <div class="bar-row">
+        <span>Fire Rate</span>
+        <div class="bar"><div id="fireRateFill" class="fill fire"></div></div>
+        <span id="fireRateText">1.00x</span>
+      </div>
+      <div class="bar-row">
+        <span>Oxygen</span>
+        <div class="bar"><div id="oxygenFill" class="fill oxygen"></div></div>
+        <span id="oxygenText">50</span>
+      </div>
+      <div class="bar-row">
+        <span>Pollution</span>
+        <div class="bar"><div id="pollutionFill" class="fill pollution"></div></div>
+        <span id="pollutionText">50</span>
+      </div>
     </div>
 
-    <canvas id="gameCanvas"></canvas>
+    <div id="status">Press E near trees, bins, or animals.</div>
 
     <script type="module" src="./game.js"></script>
   </body>
