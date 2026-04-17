@@ -6,7 +6,7 @@ body {
   margin: 0;
   overflow: hidden;
   font-family: Arial, Helvetica, sans-serif;
-  background: #0f172a;
+  background: #000;
   color: #e2e8f0;
 }
 
@@ -18,36 +18,100 @@ body {
 
 #hud {
   position: fixed;
-  top: 12px;
-  left: 12px;
-  width: min(430px, 94vw);
-  padding: 12px;
-  border-radius: 10px;
-  background: rgba(2, 6, 23, 0.78);
+  top: 10px;
+  left: 10px;
+  width: min(360px, calc(100vw - 20px));
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.65);
   border: 1px solid rgba(148, 163, 184, 0.35);
   z-index: 10;
-  backdrop-filter: blur(5px);
+  backdrop-filter: blur(4px);
 }
 
-#hud h1 {
-  margin: 0 0 6px 0;
-  font-size: 1.2rem;
-}
-
-#hud p {
-  margin: 8px 0;
-  font-size: 0.92rem;
-}
-
-.stats-grid {
+.bar-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px 10px;
-  margin-top: 8px;
+  grid-template-columns: 78px 1fr 46px;
+  align-items: center;
+  gap: 8px;
+  margin: 7px 0;
+  font-size: 0.85rem;
 }
 
-#message {
-  min-height: 20px;
-  color: #86efac;
-  font-weight: bold;
+.bar {
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.fill {
+  height: 100%;
+  width: 50%;
+  transition: width 0.2s ease;
+}
+
+.fill.health {
+  background: linear-gradient(90deg, #ef4444, #f97316);
+}
+
+.fill.fire {
+  background: linear-gradient(90deg, #38bdf8, #818cf8);
+}
+
+.fill.oxygen {
+  background: linear-gradient(90deg, #14b8a6, #22c55e);
+}
+
+.fill.pollution {
+  background: linear-gradient(90deg, #eab308, #f97316);
+}
+
+#status {
+  position: fixed;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  max-width: min(92vw, 700px);
+  text-align: center;
+  font-size: 0.95rem;
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  z-index: 11;
+}
+
+#crosshair {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 12;
+}
+
+#crosshair::before,
+#crosshair::after {
+  content: "";
+  position: absolute;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 3px rgba(2, 6, 23, 0.95);
+}
+
+#crosshair::before {
+  width: 2px;
+  height: 18px;
+  left: 8px;
+  top: 0;
+}
+
+#crosshair::after {
+  width: 18px;
+  height: 2px;
+  left: 0;
+  top: 8px;
 }
