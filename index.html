@@ -449,7 +449,6 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'Arial Black',Arial
 }
 #hiOverlay.open{display:flex;}
 .hi-h{color:#ffeb3b;font-size:clamp(1.3rem,4vw,1.8rem);font-weight:900;text-align:center;}
-.hi-sub{font-size:.78rem;color:rgba(255,255,255,.45);font-family:Arial,sans-serif;text-align:center;margin-top:-6px;}
 .hi-row{display:flex;align-items:center;gap:8px;padding:10px 16px;border-radius:12px;
   background:rgba(255,255,255,.07);color:#e8f5e9;font-size:.88rem;
   font-family:Arial,sans-serif;width:min(96%,420px);box-sizing:border-box;}
@@ -459,15 +458,6 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'Arial Black',Arial
 #hiRows{display:flex;flex-direction:column;align-items:center;width:100%;gap:4px;max-height:55vh;overflow-y:auto;}
 #hiRows::-webkit-scrollbar{width:4px;}
 #hiRows::-webkit-scrollbar-thumb{background:rgba(255,255,255,.2);border-radius:4px;}
-#hiSetupBox{
-  background:linear-gradient(135deg,rgba(255,152,0,.12),rgba(255,193,7,.08));
-  border:1.5px solid rgba(255,193,7,.35);
-  border-radius:16px;padding:16px 20px;
-  width:min(96%,420px);box-sizing:border-box;
-}
-#hiSetupBox h4{color:#ffc107;font-size:.85rem;margin:0 0 8px;letter-spacing:.3px;}
-#hiSetupBox ol{color:rgba(255,255,255,.75);font-size:.78rem;font-family:Arial,sans-serif;line-height:1.8;padding-left:18px;margin:0;}
-#hiSetupBox code{background:rgba(255,255,255,.12);padding:2px 6px;border-radius:4px;font-size:.75rem;color:#fff;word-break:break-all;}
 
 .particle{position:fixed;pointer-events:none;border-radius:50%;animation:particleFly .8s forwards;z-index:9999;}
 .floatScore{position:fixed;pointer-events:none;font-weight:900;font-size:1.4rem;animation:floatUp .9s forwards;z-index:9999;text-shadow:0 2px 8px rgba(0,0,0,.4);}
@@ -1858,17 +1848,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'Arial Black',Arial
 <!-- HI SCORES -->
 <div id="hiOverlay">
   <div class="hi-h">🏆 Өндөр оноо</div>
-  <div class="hi-sub" id="hiSource">📍 Зөвхөн энэ төхөөрөмж</div>
   <div id="hiRows"></div>
-  <div id="hiSetupBox" style="display:none">
-    <h4>🌐 Бүх төхөөрөмжөөс харагдахад тохируулах</h4>
-    <ol>
-      <li><a href="https://console.firebase.google.com" target="_blank" style="color:#ffc107">console.firebase.google.com</a> → <strong style="color:#fff">Add project</strong></li>
-      <li>Build → <strong style="color:#fff">Realtime Database</strong> → Create Database → <strong style="color:#fff">Test mode</strong></li>
-      <li>Database URL-ийг хуулна (жш: <code>https://myapp-rtdb.firebaseio.com</code>)</li>
-      <li>Тоглоомын HTML файлыг текст засварлагчаар нээж:<br><code>const FIREBASE_DB = '';</code> → хаалт дотор URL буулга</li>
-    </ol>
-  </div>
   <button class="po-btn green" onclick="closeHi()">Хаах</button>
 </div>
 
@@ -2488,19 +2468,13 @@ function renderHiRows(rows){
 /* ── Open leaderboard ── */
 async function openHi(){
   document.getElementById('hiOverlay').classList.add('open');
-  const setupBox=document.getElementById('hiSetupBox');
-  const sourceLbl=document.getElementById('hiSource');
-
+  document.getElementById('hiRows').innerHTML=
+    '<div class="hi-row" style="justify-content:center;opacity:.5;font-family:Arial,sans-serif">⏳ Ачааллаж байна…</div>';
   if(FIREBASE_DB){
-    setupBox.style.display='none';
-    sourceLbl.textContent='🌐 Бүх төхөөрөмж — ачааллаж байна…';
-    document.getElementById('hiRows').innerHTML=
-      '<div class="hi-row" style="justify-content:center;opacity:.5;font-family:Arial,sans-serif">⏳ Ачааллаж байна…</div>';
     try{
       const r=await fetch(`${FIREBASE_DB}/scores.json`,{cache:'no-store'});
       if(!r.ok) throw new Error('HTTP '+r.status);
       const data=await r.json();
-      sourceLbl.textContent='🌐 Бүх төхөөрөмжийн оноо';
       if(data && typeof data==='object' && !Array.isArray(data)){
         const rows=Object.values(data)
           .filter(x=>x&&typeof x==='object')
@@ -2510,19 +2484,10 @@ async function openHi(){
       renderHiRows([]);
     }catch(e){
       console.error('Firebase error:',e);
-      sourceLbl.textContent='⚠️ Холболт амжилтгүй — дотоод оноо харуулна';
       const hs=JSON.parse(localStorage.getItem('rssHS3')||'[]');
       renderHiRows(hs.map(h=>({name:h.name,score:h.s,level:h.lv})));
-      // Show hint
-      document.getElementById('hiRows').insertAdjacentHTML('afterend',
-        `<div style="font-size:.72rem;color:rgba(255,100,100,.8);font-family:Arial,sans-serif;text-align:center;max-width:360px;margin-top:4px">
-          Алдаа: ${e.message||'network error'}<br>Firebase URL зөв эсэхийг шалгана уу.
-        </div>`);
     }
   } else {
-    // Not configured — show local + setup instructions
-    sourceLbl.textContent='📍 Зөвхөн энэ төхөөрөмж';
-    setupBox.style.display='block';
     const hs=JSON.parse(localStorage.getItem('rssHS3')||'[]');
     renderHiRows(hs.map(h=>({name:h.name,score:h.s,level:h.lv})));
   }
